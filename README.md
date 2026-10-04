@@ -2,7 +2,7 @@
 
 **vLooper** is a lightweight local automation daemon (Loop & Harness Engineering) that transforms the **Ollama + OpenCode** stack into an autonomous AI developer for GitHub organizations.
 
-It scans organization-wide issues/PRs, pulls repositories locally, and runs a continuous "Write -> Test $\\rightarrow$ Fix" loop using `OpenCode` until the task is solved and a Pull Request is created.
+It scans organization-wide issues/PRs, pulls repositories locally, and runs a continuous "Write -> Test -> Fix" loop using `OpenCode` until the task is solved and a Pull Request is created.
 
 ---
 
