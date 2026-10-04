@@ -5,13 +5,14 @@ import subprocess
 
 from vlooper.config import config
 from vlooper.database import Database
+from vlooper.exceptions import VLooperError
 
 
 def run_command(cmd, cwd=None, timeout=None):
     """Run a command with an optional timeout."""
     try:
         res = subprocess.run(
-            cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout
+            cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False
         )
         if res.returncode != 0:
             error_msg = f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
@@ -22,7 +23,7 @@ def run_command(cmd, cwd=None, timeout=None):
         stderr = e.stderr.decode() if e.stderr else ""
         error_msg = f"Command timed out after {timeout}s: {' '.join(cmd)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
         return None, error_msg
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return None, str(e)
 
 
@@ -42,7 +43,7 @@ class Worker:
                     num = parts[-1]
                 else:
                     return  # Skip if we can't find human-readable issue number in branch
-            except:
+            except Exception:  # noqa: BLE001
                 return
         else:
             # For PRs, this is handled by different logic or requires more state.
@@ -59,7 +60,7 @@ class Worker:
             "--body",
             message,
         ]
-        stdout, err = run_command(comment_cmd)
+        _stdout, err = run_command(comment_cmd)
         if err:
             print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
 
@@ -90,8 +91,8 @@ class Worker:
                 self._post_github_comment(task, "✅ Task completed successfully!")
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
-                raise Exception("Task execution failed (see logs).")
-        except Exception as e:
+                raise VLooperError("Task execution failed (see logs).")
+        except Exception as e:  # noqa: BLE001
             error_msg = str(e)
             print(f"❌ Task #{task_id} failed: {error_msg}")
             self.db.fail_task(task_id, error_msg)
@@ -117,7 +118,7 @@ class Worker:
             try:
                 num = branch_name.split("-")[-1]
                 commit_msg = f"fix #{num}"
-            except:
+            except Exception:  # noqa: BLE001
                 commit_msg = "fix issue"
         else:
             commit_msg = f"refactor PR on {branch_name}"
@@ -129,21 +130,21 @@ class Worker:
 
         if not os.path.exists(repo_dir):
             print(f"📦 Cloning repository {repo_full_name}...")
-            stdout, err = run_command(
+            _stdout, err = run_command(
                 ["gh", "repo", "clone", repo_full_name, repo_short_name], cwd=base_dir
             )
             if err:
-                raise Exception(err)
+                raise VLooperError(err)
 
         # 2. Reset to main and update
         print("🧹 Resetting to main...")
-        stdout, err = run_command(
+        _stdout, err = run_command(
             ["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout
         )
         if err:
-            raise Exception(err)
+            raise VLooperError(err)
 
-        stdout, err = run_command(
+        _stdout, err = run_command(
             ["git", "pull", "origin", "main"],
             cwd=repo_dir,
             timeout=config.execution_timeout,
@@ -153,23 +154,23 @@ class Worker:
 
         # 3. Checkout/Create task branch
         print(f"🌿 Preparing branch {branch_name}...")
-        stdout, err = run_command(
+        _stdout, err = run_command(
             ["git", "checkout", "-B", branch_name],
             cwd=repo_dir,
             timeout=config.execution_timeout,
         )
         if err:
-            raise Exception(err)
+            raise VLooperError(err)
 
         if task_type == "PR":
             print(f"📥 Pulling remote branch {branch_name}...")
-            stdout, err = run_command(
+            _stdout, err = run_command(
                 ["git", "pull", "origin", branch_name],
                 cwd=repo_dir,
                 timeout=config.execution_timeout,
             )
             if err:
-                raise Exception(err)
+                raise VLooperError(err)
 
         # 4. Run Opencode with Hardcore Loop
         print("🚀 Running OpenCode with Hardcore Loop...")
@@ -194,7 +195,7 @@ class Worker:
                 "--prompt",
                 current_context,
             ]
-            stdout, err = run_command(
+            _stdout, err = run_command(
                 opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout
             )
             if err:
@@ -206,7 +207,7 @@ class Worker:
             # Step B (Verify)
             test_cmd = shlex.split(config.test_command)
             print(f"🧪 Running tests: {config.test_command}")
-            test_stdout, test_err = run_command(
+            _test_stdout, test_err = run_command(
                 test_cmd, cwd=repo_dir, timeout=config.execution_timeout
             )
 
@@ -222,7 +223,7 @@ class Worker:
                 self.db.fail_task(task_id, test_err)
 
         if not success:
-            raise Exception(f"Task failed after {config.max_retries} retries.")
+            raise VLooperError(f"Task failed after {config.max_retries} retries.")
 
         # 5. Commit and Push
         print("💾 Committing changes...")
@@ -236,19 +237,19 @@ class Worker:
             "-am",
             commit_msg,
         ]
-        stdout, err = run_command(
+        _stdout, err = run_command(
             commit_cmd, cwd=repo_dir, timeout=config.execution_timeout
         )
         if err:
-            raise Exception(err)
+            raise VLooperError(err)
 
         print("📤 Pushing to origin...")
         push_cmd = ["git", "push", "origin", branch_name]
-        stdout, err = run_command(
+        _stdout, err = run_command(
             push_cmd, cwd=repo_dir, timeout=config.execution_timeout
         )
         if err:
-            raise Exception(err)
+            raise VLooperError(err)
 
         # 6. Create PR if it was an issue
         if task_type == "ISSUE":
@@ -264,11 +265,11 @@ class Worker:
                 "--body",
                 "Automated fix by vLooper agent.",
             ]
-            stdout, err = run_command(
+            _stdout, err = run_command(
                 pr_create_cmd, cwd=repo_dir, timeout=config.execution_timeout
             )
             if err:
-                raise Exception(err)
+                raise VLooperError(err)
 
         return True
 
@@ -319,7 +320,7 @@ class Worker:
                     )
 
                 return f"Задача #{num} в репозитории {repo_full_name}: {title}\nОписание:\n{body}\n\nИстория переписки:\n{comments_text}"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Error getting issue context: {e}")
                 return None
         else:  # PR
@@ -359,7 +360,7 @@ class Worker:
                     return None
 
                 return f"Доработка по Pull Request #{num} в репозитории {repo_full_name} (ветка {branch}).\nЗамечания к коду:\n{review_text}\n\nОписание PR:\n{body}"
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 print(f"Error getting PR context: {e}")
                 return None
 
@@ -367,6 +368,6 @@ class Worker:
         if task["task_type"] == "ISSUE":
             try:
                 return task["branch_name"].split("-")[-1]
-            except:
+            except Exception:  # noqa: BLE001
                 return "unknown"
         return "PR"

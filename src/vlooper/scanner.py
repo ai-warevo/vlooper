@@ -7,7 +7,7 @@ from vlooper.database import Database
 
 def run_command(cmd):
     """Helper to run shell commands."""
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if res.returncode != 0:
         print(f"Command failed: {' '.join(cmd)}\nError: {res.stderr}")
         return None

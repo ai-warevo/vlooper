@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 
@@ -23,7 +25,7 @@ class VLooperTUI(App):
     }
     """
 
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [("q", "quit", "Quit")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -62,7 +64,7 @@ class VLooperTUI(App):
                     t["branch_name"],
                     t["status"],
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.status_label.update(f"⚠️ Error loading data: {e}")
 
     def action_quit(self) -> None:

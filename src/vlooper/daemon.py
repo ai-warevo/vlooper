@@ -56,7 +56,7 @@ class VLooperDaemon:
                     # Sleep to avoid hammering everything
                     time.sleep(30)
 
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(f"⚠️ Unexpected error in daemon loop: {e}")
                     time.sleep(10)
 
