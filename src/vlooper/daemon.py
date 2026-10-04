@@ -59,6 +59,9 @@ class VLooperDaemon:
         lock_fd.close()
         print("👋 Daemon shut down.")
 
-if __name__ == "__main__":
+def main():
     daemon = VLooperDaemon()
     daemon.run()
+
+if __name__ == "__main__":
+    main()

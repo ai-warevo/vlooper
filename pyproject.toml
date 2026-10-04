@@ -1,0 +1,14 @@
+[project]
+name = "vlooper"
+version = "0.1.0"
+description = "AI Git-Flow automation daemon (vLooper)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+vlooper = "vlooper.daemon:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
