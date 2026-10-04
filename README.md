@@ -49,6 +49,14 @@ To start the daemon (the engine that scans and processes tasks):
 uv run main.py
 ```
 
+**Advanced usage:**
+* `--retry-failed`: Instead of scanning GitHub for new tasks, the daemon will look for failed tasks in the local database and try to process them again. Useful after you've patched a bug that caused previous failures!
+
+```sh
+# Retry all FAILED tasks from the database
+uv run main.py --retry-failed
+```
+
 ### 3. Monitoring (TUI Dashboard)
 To see what the agent is doing in real-time with a beautiful terminal interface, **open a second terminal** and run:
 
