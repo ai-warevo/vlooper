@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import shlex
 from vlooper.config import config
 from vlooper.database import Database
 
@@ -9,11 +10,14 @@ def run_command(cmd, cwd=None, timeout=None):
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout)
         if res.returncode != 0:
-            error_msg = f"Command failed: {' '.join(cmd)}\nStderr: {res.stderr}"
+            error_msg = f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
             return None, error_msg
         return res.stdout.strip(), None
-    except subprocess.TimeoutExpired:
-        return None, f"Command timed out after {timeout}s: {' '.join(cmd)}"
+    except subprocess.TimeoutExpired as e:
+        stdout = e.stdout.decode() if e.stdout else ""
+        stderr = e.stderr.decode() if e.stderr else ""
+        error_msg = f"Command timed out after {timeout}s: {' '.join(cmd)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        return None, error_msg
     except Exception as e:
         return None, str(e)
 
@@ -102,11 +106,41 @@ class Worker:
              stdout, err = run_command(["git", "pull", "origin", branch_name], cwd=repo_dir, timeout=config.execution_timeout)
              if err: raise Exception(err)
 
-        # 4. Run Opencode
-        print(f"🚀 Running OpenCode...")
-        opencode_cmd = ["opencode", "--model", config.model, "--run-test", config.test_command, context]
-        stdout, err = run_command(opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout)
-        if err: raise Exception(err)
+        # 4. Run Opencode with Hardcore Loop
+        print(f"🚀 Running OpenCode with Hardcore Loop...")
+        current_context = context
+        success = False
+
+        for attempt in range(config.max_retries + 1):
+            if attempt > 0:
+                print(f"🔄 Attempt {attempt}/{config.max_retries}...")
+
+            # Step A (Generate)
+            opencode_cmd = ["opencode", "run", "--model", config.model, "--prompt", current_context]
+            stdout, err = run_command(opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+            if err:
+                print(f"⚠️ Opencode error on attempt {attempt}: {err}")
+                current_context += f"\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+                continue
+
+            # Step B (Verify)
+            test_cmd = shlex.split(config.test_command)
+            print(f"🧪 Running tests: {config.test_command}")
+            test_stdout, test_err = run_command(test_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+
+            if test_err is None:
+                # Step C (Evaluate/Feedback) - Success
+                print(f"🎉 Tests passed on attempt {attempt}!")
+                success = True
+                break
+            else:
+                # Step C (Evaluate/Feedback) - Failure
+                print(f"❌ Tests failed on attempt {attempt}.")
+                current_context += f"\nThe previous attempt failed with the following errors:\n{test_err}\nPlease fix these issues and try again."
+
+        if not success:
+            raise Exception(f"Task failed after {config.max_retries} retries.")
+
 
         # 5. Commit and Push
         print(f"💾 Committing changes...")
