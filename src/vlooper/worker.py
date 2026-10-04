@@ -6,6 +6,7 @@ import shlex
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
+from vlooper.github_client import get_pr_details
 from vlooper.utils import run_command
 
 
@@ -19,32 +20,30 @@ class Worker:  # pylint: disable=too-few-public-methods
     def _post_github_comment(self, task, message):
         """Helper to post a comment to the respective GitHub issue or PR."""
         repo_full_name = task["repo_full_name"]
+        task_type = task["task_type"]
+        branch_name = task["branch_name"]
 
-        if task["task_type"] == "ISSUE":
+        if task_type == "ISSUE":
             try:
                 # Extracting number from branch name like 'issue-123'
-                parts = task["branch_name"].split("-")
+                parts = branch_name.split("-")
                 if len(parts) >= 2:
                     num = parts[-1]
+                    comment_cmd = [
+                        "gh", "issue", "comment", str(num),
+                        "--repo", repo_full_name,
+                        "--body", message,
+                    ]
+                    _, err = run_command(comment_cmd)
+                    if err:
+                        print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
                 else:
-                    return  # Skip if we can't find human-readable issue number in branch
-            except Exception:  # noqa: W0718
-                return
-        return  # For PRs, this is handled by different logic or requires more state.
-
-        comment_cmd = [
-            "gh",
-            "issue",
-            "comment",
-            str(num),
-            "--repo",
-            repo_full_name,
-            "--body",
-            message,
-        ]
-        _, err = run_command(comment_cmd)
-        if err:
-            print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
+                    print(f"⚠️ Could not find issue number in branch name: {branch_name}")
+            except Exception as e:  # noqa: W0718
+                print(f"⚠️ Error posting GitHub comment: {e}")
+        elif task_type == "PR":
+            # For PRs, this is handled by different logic or requires more state.
+            pass
 
     def process_next_task(self):
         """Process the next pending task from the database."""
@@ -297,37 +296,18 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _get_pr_context(self, task, repo_full_name):
         try:
-            branch = task["branch_name"]
-            list_pr_cmd = [
-                "gh", "pr", "list",
-                "--repo", repo_full_name,
-                "--head", branch,
-                "--json", "number,title,body,comments,reviews",
-            ]
-            res_p, err_p = run_command(list_pr_cmd)
-            if err_p or not res_p:
+            details = get_pr_details(repo_full_name, task["branch_name"])
+            if not details:
                 return None
-            prs = json.loads(res_p)
-            if not prs:
-                return None
-            pr = prs[0]
 
-            num = pr["number"]
-            body = pr["body"] or ""
-
-            review_text = ""
-            for r in pr.get("reviews", []):
-                if r.get("body"):
-                    review_text += f"Ревью от {r['author']['login']}: {r['body']}\n"
-            for c in pr.get("comments", []):
-                review_text += f"Замечание от {c['author']['login']}: {c['body']}\n"
+            num, _, body, review_text = details
 
             if "Исправлено ботом" in review_text:
                 return None
 
             return (
                 f"Доработка по Pull Request #{num} в репозитории "
-                f"{repo_full_name} (ветка {branch}).\nЗамечания к коду:\n"
+                f"{repo_full_name} (ветка {task['branch_name']}).\nЗамечания к коду:\n"
                 f"{review_text}\n\nОписание PR:\n{body}"
             )
         except Exception:  # noqa: W0718

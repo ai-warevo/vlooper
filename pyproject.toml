@@ -27,3 +27,26 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+# Configuration for Ruff
+
+[tool.ruff.lint]
+ignore = ["BLE001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["I001", "RUF059"]
+
+[tool.mypy]
+# Configuration for Mypy
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_missing_imports = true
+
+[tool.black]
+target-version = ["py314"]
+
+[tool.pylint.messages_control]
+disable = [
+    "broad-exception-caught",  # Убирает ругань на голый except Exception
+]
