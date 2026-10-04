@@ -40,10 +40,10 @@ class Database:
             conn.commit()
         return True
 
-    def get_pending_tasks(self):
+    def get_all_tasks(self):
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
+            cursor = conn.execute("SELECT id, task_type, repo_full_name, branch_name, status FROM tasks ORDER BY created_at DESC")
             return cursor.fetchall()
 
     def claim_task(self, task_id):

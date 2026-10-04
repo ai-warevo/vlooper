@@ -5,16 +5,22 @@ description = "AI Git-Flow automation daemon (vLooper)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "textual>=0.40.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+vlooper = "vlooper.daemon:main"
+check = "check:main"
+
+[dependency-groups]
+dev = [
     "black>=26.5.1",
     "mypy>=2.4.0",
     "pylint>=4.1.2",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
 ]
-
-[project.scripts]
-vlooper = "vlooper.daemon:main"
-check = "check:main"
 
 [build-system]
 requires = ["hatchling"]

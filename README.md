@@ -1,104 +1,77 @@
 # 🔄 vLooper
 
-**vLooper** (`vlooper.py`) — это легковесный локальный демон автоматизации (Loop & Harness Engineering), который превращает связку **Ollama + OpenCode** в автономного ИИ-разработчика для организации на GitHub.
+**vLooper** is a lightweight local automation daemon (Loop & Harness Engineering) that transforms the **Ollama + OpenCode** stack into an autonomous AI developer for GitHub organizations.
 
-Скрипт раз в 5 минут сканирует всю организацию на наличие задач, назначенных на бота, автоматически выкачивает нужный репозиторий, запускает цикл генерации и исправления кода по тестам через движок `OpenCode` и присылает готовый результат обратно в виде Pull Request.
-
----
-
-## 🎯 Как это работает (AI Git-Flow)
-
-1. **Триггер:** Вы создаете задачу (Issue) в любом репозитории организации и назначаете (Assign) её на аккаунт бота.
-2. **Сканирование:** `vLooper` по крону/демону находит задачу, определяет целевой репозиторий и скачивает его в локальный воркспейс.
-3. **Изоляция:** Бот уходит в отдельную ветку (`feature/issue-XXXX`).
-4. **Конвейер (Loop):** Вызывается `OpenCode` с локальной моделью (например, `gemma`). Он пишет код и прогоняет тесты (`./test.sh`). Если тесты падают, цикл крутится локально, пока код не станет валидным.
-5. **Финиш:** Изменения коммитятся строго от лица бота и пушатся в GitHub, создавая аккуратный **Pull Request** на вас.
-6. **Code Review:** Если вы оставите замечания в комментариях к PR, `vLooper` считает их на следующей итерации, зайдет в эту же ветку, доработает код и обновит PR.
+It scans organization-wide issues/PRs, pulls repositories locally, and runs a continuous "Write $\rightarrow$ Test $\rightarrow$ Fix" loop using `OpenCode` until the task is solved and a Pull Request is created.
 
 ---
 
-## 🛠 Требования к окружению
+## 🎯 How it Works (AI Git-Flow)
 
-На машине, где запущен `vLooper`, должны быть установлены:
-* **Python 3.10+**
-* **Ollama** (с развернутой моделью, например `gemma`)
-* **OpenCode CLI** (локальный агентский движок)
-* **GitHub CLI (`gh`)**
+1.  **Trigger:** Create an Issue or PR in your organization and assign it to the bot.
+2.  **Scan:** The daemon identifies new tasks via GitHub CLI (`gh`).
+3.  **Isolate:** The worker clones the repo into a local workspace and creates a dedicated branch.
+4.  **The Loop (Harness):** 
+    *   `OpenCode` generates code changes.
+    *   The worker runs your `./test.sh`.
+    *   If tests fail, the error logs are fed back to the agent to trigger an automatic fix.
+5.  **Deliver:** Once tests pass, the bot commits and pushes the branch, creating an automated **Pull Request**.
 
 ---
 
-## 🚀 Быстрый старт
+## 🛠 Requirements
 
-### 1. Подготовка аккаунта бота
-1. Убедитесь, что аккаунт бота **`agent4mpgp`** добавлен в вашу GitHub-организацию (например, `ai-warevo`) и имеет права на запись (**Write**) в репозитории.
-2. Зайдите на GitHub под аккаунтом `agent4mpgp` и сгенерируйте **Personal Access Token (Classic)** со следующими правами: `repo`, `workflow`.
+*   **Python 3.10+** (managed via `uv`)
+*   **Ollama** (with a model like `gemma` running)
+*   **OpenCode CLI**
+*   **GitHub CLI (`gh`)** with appropriate permissions
 
-### 2. Установка скрипта
-Создайте рабочую директорию и положите туда скрипт `vlooper.py`:
+---
 
-```bash
-mkdir -p ~/ai_agent/workspace
-cd ~/ai_agent
-# Поместите файл vlooper.py в эту папку
-chmod +x vlooper.py
+## 🚀 Quick Start
+
+### 1. Installation & Setup
+Clone the repository and install the environment using `uv`:
+
+```sh
+# Install dependencies and the project
+uv sync
+
+# Set up your GitHub Token (required)
+export GH_TOKEN=your_bot_token_here
 ```
 
-### 3. Конфигурация в коде
-Убедитесь, что в начале файла `vlooper.py` выставлены правильные настройки:
-```python
-ORG_NAME = "ai-warevo"       # Ваша организация
-BOT_USERNAME = "agent4mpgp"  # Логин вашего бота
-MODEL = "ollama/gemma"       # Локальная LLM в Ollama
-TEST_COMMAND = "./test.sh"   # Команда для проверки (Harness)
+### 2. Running the Daemon
+To start the daemon in the background:
+
+```sh
+# Run as a standard process
+uv run vlooper
+```
+
+### 3. Monitoring (TUI Dashboard)
+To see what the agent is doing in real-time with a beautiful terminal interface:
+
+```sh
+# Launch the local TUI dashboard
+uv run main.py --tui
 ```
 
 ---
 
-## 🖥 Запуск в фоновом режиме (Systemd Демон)
+## 🛠 Development Commands
 
-Чтобы скрипт работал непрерывно каждые 5 минут в бэкграунде, настройте системную службу Linux.
+Use these commands to maintain code quality and run tests during development:
 
-1. Создайте файл службы:
-   ```bash
-   sudo nano /etc/systemd/system/vlooper.service
-   ```
-
-2. Вставьте следующую конфигурацию (замените `имя_пользователя` и токен на свои):
-   ```ini
-   [Unit]
-   Description=vLooper - OpenCode AI Agent Loop Daemon
-   After=network.target
-
-   [Service]
-   Type=simple
-   User=имя_пользователя
-   WorkingDirectory=/home/имя_пользователя/ai_agent
-   Environment=GH_TOKEN=ghp_ВАШ_ТОКЕН_БОТА_AGENT4MPGP
-   ExecStart=/usr/bin/python3 -c "import time, subprocess; [ (subprocess.run(['python3', 'vlooper.py']), time.sleep(300)) for _ in iter(int, 1) ]"
-   Restart=always
-   RestartSec=10
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. Запустите и включите демона автозапуска:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable vlooper.service
-   sudo systemctl start vlooper.service
-   ```
-
-4. Проверка статуса и логов:
-   ```bash
-   sudo systemctl status vlooper.service
-   # Живой лог работы ИИ-агента
-   journalctl -u vlooper.service -f
-   ```
+| Command | Description |
+| :--- | :--- |
+| `uv run check` | Run linters, type checkers, and formatters |
+| `uv run pytest` | Execute the test suite |
+| `uv sync` | Synchronize local environment with `pyproject.toml` |
 
 ---
 
-## ⚠️ Важные нюансы
+## ⚠️ Important Notes
 
-* **Архитектура тестов (Harness):** `OpenCode` опирается на команду `TEST_COMMAND`. Чтобы бот не закоммитил сломанный код, обязательно создавайте в корне своих проектов файл `./test.sh`, который возвращает `exit 0`, если код рабочий, и `exit 1` при ошибках (например, запускает линтеры или юнит-тесты).
-* **Конфликты слияния:** Бот всегда уходит в изолированные ветки `issue-XXX`. Если вы правите один и тот же файл одновременно, GitHub заблокирует автоматический мерж — вы сможете разрешить конфликт вручную в интерфейсе Pull Request.
+*   **The Harness (Test Command):** For the loop to work, every repository must have a `./test.sh` in its root. This script should return `exit 0` on success and `exit 1` on failure.
+*   **Feedback Loop:** If you leave comments on a Pull Request, the bot will pick them up on its next scan and attempt to apply your requested changes!

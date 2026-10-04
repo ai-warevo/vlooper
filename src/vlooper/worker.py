@@ -25,6 +25,30 @@ class Worker:
     def __init__(self, db: Database):
         self.db = db
 
+    def _post_github_comment(self, task, message):
+        """Helper to post a comment to the respective GitHub issue or PR."""
+        repo_full_name = task['repo_full_name']
+        
+        if task['task_type'] == 'ISSUE':
+            try:
+                # Extracting number from branch name like 'issue-123'
+                parts = task['branch_name'].split('-')
+                if len(parts) >= 2:
+                    num = parts[-1]
+                else:
+                    return # Skip if we can't find human-readable issue number in branch
+            except:
+                return
+        else:
+             # For PRs, this is handled by different logic or requires more state.
+             # Providing a fallback mechanism.
+             return
+
+        comment_cmd = ["gh", "issue", "comment", str(num), "--repo", repo_full_name, "--body", message]
+        stdout, err = run_command(comment_cmd)
+        if err:
+            print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
+
     def process_next_task(self):
         tasks = self.db.get_pending_tasks()
         if not tasks:
@@ -39,10 +63,15 @@ class Worker:
         if not self.db.claim_task(task_id):
             return False  # Someone else claimed it
 
+        # Post 'Started' comment
+        self._post_github_comment(task, "🤖 vLooper has picked up this task.")
+
         try:
             success = self._execute_task(task)
             if success:
                 self.db.complete_task(task_id)
+                # Post finishing comment (for issues)
+                self._post_github_comment(task, "✅ Task completed successfully!")
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
                 raise Exception("Task execution failed (see logs).")
@@ -114,6 +143,8 @@ class Worker:
         for attempt in range(config.max_retries + 1):
             if attempt > 0:
                 print(f"🔄 Attempt {attempt}/{config.max_retries}...")
+                # Post failure comment on retry
+                self._post_github_comment(task, f"🛠️ Attempt {attempt}/{config.max_retries} failed. Retrying...")
 
             # Step A (Generate)
             opencode_cmd = ["opencode", "run", "--model", config.model, "--prompt", current_context]
