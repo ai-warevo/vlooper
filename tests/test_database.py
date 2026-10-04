@@ -1,3 +1,5 @@
+# pylint: disable=redefined-outer-name,protected-access,unused-argument
+"""Tests for the application."""
 import pytest
 
 from vlooper.config import config
@@ -6,12 +8,14 @@ from vlooper.database import Database
 
 @pytest.fixture
 def db(tmp_path):
-    # Use a temporary file for database testing to ensure isolation and persistence within the test session
+    """Create a temporary database."""
+    # Use a temporary file for database testing to ensure isolation.
     db_file = tmp_path / "test.db"
     return Database(db_path=str(db_file))
 
 
 def test_db_init(db):
+    """Verify table creation by attempting a query."""
     # Verify table creation by attempting a query
     with db._get_connection() as conn:
         cursor = conn.execute(
@@ -21,6 +25,7 @@ def test_db_init(db):
 
 
 def test_add_task(db):
+    """Test adding new tasks."""
     # Test adding new tasks
     assert db.add_task("ISSUE", "org/repo1", "issue-123") is True
     assert db.add_task("PR", "org/repo1", "feature-branch") is True
@@ -29,6 +34,7 @@ def test_add_task(db):
 
 
 def test_get_pending_tasks(db):
+    """Test getting pending tasks."""
     db.add_task("ISSUE", "org/repo1", "issue-1")
     db.add_task("PR", "org/repo2", "branch-2")
     db.add_task("ISSUE", "org/repo3", "issue-3")  # This will be PENDING
@@ -39,6 +45,7 @@ def test_get_pending_tasks(db):
 
 
 def test_claim_task(db):
+    """Test claiming a task."""
     db.add_task("ISSUE", "org/repo1", "issue-1")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
@@ -56,6 +63,7 @@ def test_claim_task(db):
 
 
 def test_complete_task(db):
+    """Test completing a task."""
     db.add_task("ISSUE", "org/repo1", "issue-1")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
@@ -68,6 +76,7 @@ def test_complete_task(db):
 
 
 def test_fail_task_retry(db, monkeypatch):
+    """Test task retry mechanism and failure threshold."""
     # Mock config for max_retries
     monkeypatch.setattr(config, "max_retries", 2)
 
@@ -101,6 +110,7 @@ def test_fail_task_retry(db, monkeypatch):
 
 
 def test_get_active_claimed_task(db):
+    """Test getting an active claimed task."""
     db.add_task("ISSUE", "org/repo1", "issue-1")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
@@ -112,6 +122,7 @@ def test_get_active_claimed_task(db):
 
 
 def test_task_exists(db):
+    """Test existence check for tasks."""
     db.add_task("ISSUE", "org/repo1", "issue-1")
     assert db.task_exists("org/repo1", "issue-1") is True
     assert db.task_exists("org/repo1", "non-existent") is False

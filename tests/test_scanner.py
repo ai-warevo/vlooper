@@ -1,3 +1,5 @@
+# pylint: disable=redefined-outer-name,protected-access,unused-argument
+"""Tests for the Scanner class."""
 import json
 from unittest.mock import MagicMock, patch
 
@@ -9,16 +11,19 @@ from vlooper.scanner import Scanner
 
 @pytest.fixture
 def db(tmp_path):
+    """Create a temporary database."""
     db_file = tmp_path / "test.db"
     return Database(db_path=str(db_file))
 
 
 @pytest.fixture
 def scanner(db):
+    """Create a scanner instance."""
     return Scanner(db)
 
 
 def test_scan_issues(scanner, db, monkeypatch):
+    """Test the issue scanning functionality."""
     # Mock the subprocess call inside run_command/Scanner._scan_issues
     mock_issues = [
         {
@@ -46,6 +51,7 @@ def test_scan_issues(scanner, db, monkeypatch):
 
 
 def test_scan_prs(scanner, db, monkeypatch):
+    """Test the PR scanning functionality."""
     # Mock the two calls: 1. search prs, 2. get branch details via gh pr view
     mock_prs = [
         {

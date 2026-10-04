@@ -1,3 +1,5 @@
+# pylint: disable=redefined-outer-name,protected-access,unused-argument
+"""Tests for the configuration module."""
 import importlib
 import os
 
@@ -5,6 +7,7 @@ from vlooper import config as config_module
 
 
 def test_config_defaults(monkeypatch):
+    """Test that config defaults are correctly loaded."""
     # Set environment variables to their default values to ensure they are used
     # even if a .env file is present.
     monkeypatch.setenv("ORG_NAME", "ai-warevo")
@@ -25,6 +28,7 @@ def test_config_defaults(monkeypatch):
 
 
 def test_config_env_override(monkeypatch):
+    """Test that environment variables override defaults."""
     monkeypatch.setenv("ORG_NAME", "custom-org")
     monkeypatch.setenv("BOT_USERNAME", "tester")
     monkeypatch.setenv("MAX_RETRIES", "5")

@@ -1,3 +1,5 @@
+# pylint: disable=redefined-outer-name,protected-access,unused-argument
+"""Tests for the Worker class."""
 import json
 import sqlite3
 from unittest.mock import patch
@@ -11,16 +13,19 @@ from vlooper.worker import Worker
 
 @pytest.fixture
 def db(tmp_path):
+    """Create a temporary database."""
     db_file = tmp_path / "test.db"
     return Database(db_path=str(db_file))
 
 
 @pytest.fixture
 def worker(db):
+    """Create a worker instance."""
     return Worker(db)
 
 
 def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
+    """Test successful task processing by the worker."""
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "issue-123")
     tasks = db.get_pending_tasks()
@@ -59,6 +64,7 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
 
 
 def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp_path):
+    """Test worker's retry mechanism and eventual failure."""
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "issue-123")
     tasks = db.get_pending_tasks()
@@ -94,6 +100,7 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
 
 
 def test_get_context_issue(worker, db, monkeypatch):
+    """Test context retrieval from external tools."""
     task = {
         "task_type": "ISSUE",
         "branch_name": "issue-1",
