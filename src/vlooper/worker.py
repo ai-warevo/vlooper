@@ -2,6 +2,7 @@
 
 import os
 import shlex
+import sqlite3
 
 from vlooper.config import config
 from vlooper.database import Database

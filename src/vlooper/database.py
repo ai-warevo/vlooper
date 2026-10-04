@@ -74,10 +74,10 @@ class Database:
             return cursor.fetchall()
 
     def reset_task_status(self, task_id):
-        """Reset a task's status to PENDING."""
+        """Reset a task's status to PENDING without resetting retry count."""
         with self._get_connection() as conn:
             conn.execute(
-                "UPDATE tasks SET status = 'PENDING', retries = 0 WHERE id = ?",
+                "UPDATE tasks SET status = 'PENDING' WHERE id = ?",
                 (task_id,),
             )
             conn.commit()
