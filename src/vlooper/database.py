@@ -59,12 +59,28 @@ class Database:
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
             return cursor.fetchall()
 
+    def get_failed_tasks(self):
+        """Retrieve all failed tasks from the database."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'FAILED'")
+            return cursor.fetchall()
+
     def get_all_tasks(self):
         """Retrieve all tasks from the database."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM tasks")
             return cursor.fetchall()
+
+    def reset_task_status(self, task_id):
+        """Reset a task's status to PENDING."""
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = 'PENDING', retries = 0 WHERE id = ?",
+                (task_id,),
+            )
+            conn.commit()
 
     def claim_task(self, task_id):
         """Claim a task for processing."""

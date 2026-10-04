@@ -14,11 +14,27 @@ class Scanner:  # pylint: disable=too-few-public-methods
         """Initialize the scanner with a database instance."""
         self.db = db
 
-    def scan(self):
+    def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
-        print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
-        self._scan_issues()
-        self._scan_prs()
+        if retry_failed:
+            print("🔄 Mode: Retrying failed tasks from database...")
+            self._retry_failed_tasks()
+        else:
+            print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
+            self._scan_issues()
+            self._scan_prs()
+
+    def _retry_failed_tasks(self):
+        """Retrieve failed tasks from DB and set them back to PENDING."""
+        failed_tasks = self.db.get_failed_tasks()
+        if not failed_tasks:
+            print("ℹ️ No failed tasks found currently.")
+            return
+
+        print(f"♻️ Found {len(failed_tasks)} failed tasks. Resetting them...")
+        for task in failed_tasks:
+            self.db.reset_task_status(task["id"])
+            print(f"   ✅ Task #{task['id']} reset to PENDING.")
 
     def _scan_issues(self):
         """Scan for open issues assigned to the bot."""

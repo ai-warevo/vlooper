@@ -29,7 +29,7 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
         print("\n🛑 Stopping daemon...")
         self.running = False
 
-    def run(self):
+    def run(self, retry_failed=False):
         """Main execution loop."""
         # Attempt to acquire an exclusive lock on the lock file
         with open(self.lock_file, "w", encoding="utf-8") as lock_fd:
@@ -39,11 +39,11 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                 print("❌ Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
-            print("🚀 vLooper Daemon started with lock acquired.")
+            print(f"🚀 vLooper Daemon started with lock acquired. (Retry mode: {retry_failed})")
             while self.running:
                 try:
                     # 1. Scan for new tasks
-                    self.scanner.scan()
+                    self.scanner.scan(retry_failed=retry_failed)
 
                     # 2. Check if a worker is already active (as a secondary check)
                     active_task = self.db.get_active_claimed_task()
@@ -66,10 +66,10 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
         print("👋 Daemon shut down.")
 
 
-def main():
+def main(retry_failed=False):
     """Entry point for the daemon."""
     daemon = VLooperDaemon()
-    daemon.run()
+    daemon.run(retry_failed=retry_failed)
 
 
 if __name__ == "__main__":

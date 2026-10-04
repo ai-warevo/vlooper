@@ -86,9 +86,43 @@ class Worker:  # pylint: disable=too-few-public-methods
             error_msg = str(e)
             print(f"❌ Task #{task_id} failed: {error_msg}")
             self.db.fail_task(task_id, error_msg)
+
+            if self._is_terminal_failure(task_id):
+                print(f"📢 Task #{task_id} reached terminal failure. Escalating...")
+                self._post_escalation_comment(task, error_msg)
+
             return False
 
         return True
+
+    def _is_terminal_failure(self, task_id) -> bool:
+        """Check if the task has exhausted all retries."""
+        with self.db._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT status, retries FROM tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            if row and row["status"] == "FAILED":
+                return row["retries"] >= config.max_retries
+        return False
+
+    def _post_escalation_comment(self, task, last_error):
+        """Post a final failure comment tagging the user."""
+        repo_full_name = task["repo_full_name"]
+        task_type = task["task_type"]
+        branch_name = task["branch_name"]
+
+        # In a real scenario, we'd fetch the actual author's login.
+        # For now, let's use @assignee as requested by user logic.
+        mention = "@assignee" 
+
+        msg = (
+            f"🚨 **vLooper Escalation** 🚨\n\n"
+            f"I have attempted to solve this task {config.max_retries + 1} times but failed.\n"
+            f"**Last Error:** `{last_error}`\n\n"
+            f"Please take manual action. {mention}"
+        )
+
+        self._post_github_comment(task, msg)
 
     def _execute_task(self, task, task_id):
         """Execute the task details."""
