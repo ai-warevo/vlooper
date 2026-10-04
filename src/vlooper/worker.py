@@ -203,7 +203,6 @@ class Worker:  # pylint: disable=too-few-public-methods
                 "run",
                 "--model",
                 config.model,
-                "--prompt",
                 current_context,
             ]
             _, err = run_command(

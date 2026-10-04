@@ -42,20 +42,22 @@ export GH_TOKEN=your_bot_token_here
 ```
 
 ### 2. Running the Daemon
-To start the daemon in the background:
+To start the daemon (the engine that scans and processes tasks):
 
 ```sh
-# Run as a standard process
-uv run vlooper
+# Run the core engine in a dedicated terminal
+uv run main.py
 ```
 
 ### 3. Monitoring (TUI Dashboard)
-To see what the agent is doing in real-time with a beautiful terminal interface:
+To see what the agent is doing in real-time with a beautiful terminal interface, **open a second terminal** and run:
 
 ```sh
-# Launch the local TUI dashboard
+# Launch the local TUI dashboard in another terminal
 uv run main.py --tui
 ```
+*Note: The TUI is only a viewer. You must have the daemon running in a separate window to see any activity.*
+
 
 ---
 
