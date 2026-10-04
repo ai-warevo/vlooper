@@ -30,7 +30,7 @@ class Config:  # pylint: disable=too-many-instance-attributes
         default_factory=lambda: int(os.environ.get("MAX_RETRIES", "2"))
     )
     execution_timeout: int = field(
-        default_factory=lambda: int(os.environ.get("EXECUTION_TIMEOUT", "15"))
+        default_factory=lambda: int(os.environ.get("EXECUTION_TIMEOUT", "300"))
     )
     workspace_base_dir: str = field(
         default_factory=lambda: os.environ.get(
