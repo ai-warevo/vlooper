@@ -11,5 +11,8 @@ wheels/
 # Virtual environments
 .venv
 
+# Secrets
+.env
+
 # Databases
 vlooper.db
