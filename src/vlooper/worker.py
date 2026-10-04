@@ -1,3 +1,4 @@
+"""Worker module to execute tasks via OpenCode."""
 import json
 import os
 import shlex
@@ -15,20 +16,29 @@ def run_command(cmd, cwd=None, timeout=None):
             cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False
         )
         if res.returncode != 0:
-            error_msg = f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\nSTDERR:\n{res.stderr}"
+            error_msg = (
+                f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\n"
+                f"STDERR:\n{res.stderr}"
+            )
             return None, error_msg
         return res.stdout.strip(), None
     except subprocess.TimeoutExpired as e:
         stdout = e.stdout.decode() if e.stdout else ""
         stderr = e.stderr.decode() if e.stderr else ""
-        error_msg = f"Command timed out after {timeout}s: {' '.join(cmd)}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        error_msg = (
+            f"Command timed out after {timeout}s: {' '.join(cmd)}\n"
+            f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}"
+        )
         return None, error_msg
     except Exception as e:  # noqa: BLE001
         return None, str(e)
 
 
 class Worker:
+    """Worker to handle task execution and GitHub interactions."""
+
     def __init__(self, db: Database):
+        """Initialize the worker with a database instance."""
         self.db = db
 
     def _post_github_comment(self, task, message):
@@ -65,6 +75,7 @@ class Worker:
             print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
 
     def process_next_task(self):
+        """Process the next pending task from the database."""
         tasks = self.db.get_pending_tasks()
         if not tasks:
             return False
@@ -74,7 +85,8 @@ class Worker:
         task_id = task["id"]
 
         print(
-            f"🛠 Picking up task #{task_id}: {task['task_type']} in {task['repo_full_name']} (branch: {task['branch_name']})"
+            f"🛠 Picking up task #{task_id}: {task['task_type']} in "
+            f"{task['repo_full_name']} (branch: {task['branch_name']})"
         )
 
         if not self.db.claim_task(task_id):
@@ -101,6 +113,7 @@ class Worker:
         return True
 
     def _execute_task(self, task, task_id):
+        """Execute the task details."""
         repo_full_name = task["repo_full_name"]
         branch_name = task["branch_name"]
         task_type = task["task_type"]
@@ -113,7 +126,10 @@ class Worker:
         if not context:
             return False
 
-        commit_msg = f"{'refactor: ' if task_type == 'PR' else 'fix: '} #{self._get_issue_number(task)}"
+        commit_msg = (
+            f"{'refactor: ' if task_type == 'PR' else 'fix: '} "
+            f"#{self._get_issue_number(task)}"
+        )
         if task_type == "ISSUE":
             try:
                 num = branch_name.split("-")[-1]
@@ -200,7 +216,10 @@ class Worker:
             )
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                current_context += f"\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+                current_context += (
+                    f"\nThe previous attempt failed with the following errors:\n{err}"
+                    "\nPlease fix these issues and try again."
+                )
                 self.db.fail_task(task_id, err)
                 continue
 
@@ -219,7 +238,10 @@ class Worker:
             else:
                 # Step C (Evaluate/Feedback) - Failure
                 print(f"❌ Tests failed on attempt {attempt}.")
-                current_context += f"\nThe previous attempt failed with the following errors:\n{test_err}\nPlease fix these issues and try again."
+                current_context += (
+                    f"\nThe previous attempt failed with the following errors:\n{test_err}"
+                    "\nPlease fix these issues and try again."
+                )
                 self.db.fail_task(task_id, test_err)
 
         if not success:
@@ -274,6 +296,7 @@ class Worker:
         return True
 
     def _get_context(self, task, repo_full_name):
+        """Fetch context for the task from GitHub."""
         num = (
             task["branch_name"].split("-")[-1] if task["task_type"] == "ISSUE" else None
         )
@@ -319,7 +342,10 @@ class Worker:
                         ]
                     )
 
-                return f"Задача #{num} в репозитории {repo_full_name}: {title}\nОписание:\n{body}\n\nИстория переписки:\n{comments_text}"
+                return (
+                    f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
+                    f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
+                )
             except Exception as e:  # noqa: BLE001
                 print(f"Error getting issue context: {e}")
                 return None
@@ -359,15 +385,22 @@ class Worker:
                 if "Исправлено ботом" in review_text:
                     return None
 
-                return f"Доработка по Pull Request #{num} в репозитории {repo_full_name} (ветка {branch}).\nЗамечания к коду:\n{review_text}\n\nОписание PR:\n{body}"
+                return (
+                    f"Доработка по Pull Request #{num} в репозитории "
+                    f"{repo_full_name} (ветка {branch}).\nЗамечания к коду:\n"
+                    f"{review_text}\n\nОписание PR:\n{body}"
+                )
             except Exception as e:  # noqa: BLE001
                 print(f"Error getting PR context: {e}")
                 return None
 
     def _get_issue_number(self, task):
+        """Get issue number from task."""
         if task["task_type"] == "ISSUE":
             try:
                 return task["branch_name"].split("-")[-1]
             except Exception:  # noqa: BLE001
                 return "unknown"
         return "PR"
+
+

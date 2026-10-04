@@ -1,3 +1,4 @@
+"""Textual TUI for vLooper."""
 from typing import ClassVar
 
 from textual.app import App, ComposeResult
@@ -7,6 +8,8 @@ from vlooper.database import Database
 
 
 class VLooperTUI(App):
+    """Main application class for the vLooper TUI."""
+
     CSS = """
     Screen {
         background: #1e1e1e;
@@ -27,14 +30,22 @@ class VLooperTUI(App):
 
     BINDINGS: ClassVar = [("q", "quit", "Quit")]
 
+    def __init__(self):
+        """Initialize the TUI application."""
+        super().__init__()
+        self.db = Database()
+        self.table = None  # type: ignore
+        self.status_label = None  # type: ignore
+
     def compose(self) -> ComposeResult:
+        """Compose the UI components."""
         yield Header()
         yield Static("Initializing...", id="status-panel")
         yield DataTable()
         yield Footer()
 
     def on_mount(self) -> None:
-        self.db = Database()
+        """Called when the application is mounted."""
         self.table = self.query_one(DataTable)
         self.status_label = self.query_one("#status-panel", Static)
         self.table.add_columns("ID", "Type", "Repo", "Branch", "Status")
@@ -42,6 +53,7 @@ class VLooperTUI(App):
         self.update_data()
 
     def update_data(self) -> None:
+        """Update the table and status panel with latest data."""
         try:
             # Update Status Panel
             active = self.db.get_active_claimed_task()
@@ -51,23 +63,28 @@ class VLooperTUI(App):
                 )
             else:
                 status_text = "💤 IDLE - Waiting for tasks..."
-            self.status_label.update(status_text)
+
+            if self.status_label:
+                self.status_label.update(status_text)
 
             # Update Table
             tasks = self.db.get_all_tasks()
-            self.table.clear()
-            for t in tasks:
-                self.table.add_row(
-                    str(t["id"]),
-                    t["task_type"],
-                    t["repo_full_name"].split("/")[-1],
-                    t["branch_name"],
-                    t["status"],
-                )
+            if self.table:
+                self.table.clear()
+                for t in tasks:
+                    self.table.add_row(
+                        str(t["id"]),
+                        t["task_type"],
+                        t["repo_full_name"].split("/")[-1],
+                        t["branch_name"],
+                        t["status"],
+                    )
         except Exception as e:  # noqa: BLE001
-            self.status_label.update(f"⚠️ Error loading data: {e}")
+            if self.status_label:
+                self.status_label.update(f"⚠️ Error loading data: {e}")
 
     async def action_quit(self) -> None:
+        """Handle the quit action."""
         self.exit()
 
 

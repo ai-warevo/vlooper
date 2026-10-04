@@ -12,9 +12,8 @@ def run_command(command: list[str]) -> int:
         if result.returncode == 0:
             print("✅ Success!")
             return 0
-        else:
-            print(f"❌ Error! Return code: {result.returncode}")
-            return result.returncode
+        print(f"❌ Error! Return code: {result.returncode}")
+        return result.returncode
     except OSError as e:
         print(f"❌ Failed to run command: {e}")
         return 1

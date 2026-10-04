@@ -1,3 +1,4 @@
+"""The main daemon process for vLooper."""
 import fcntl
 import signal
 import sys
@@ -22,7 +23,7 @@ class VLooperDaemon:
         signal.signal(signal.SIGINT, self._handle_exit)
         signal.signal(signal.SIGTERM, self._handle_exit)
 
-    def _handle_exit(self, signum: int, frame):
+    def _handle_exit(self, _signum: int, _frame):
         """Handle exit signal."""
         print("\n🛑 Stopping daemon...")
         self.running = False
@@ -30,7 +31,7 @@ class VLooperDaemon:
     def run(self):
         """Main execution loop."""
         # Attempt to acquire an exclusive lock on the lock file
-        with open(self.lock_file, "w") as lock_fd:
+        with open(self.lock_file, "w", encoding="utf-8") as lock_fd:
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
@@ -47,7 +48,8 @@ class VLooperDaemon:
                     active_task = self.db.get_active_claimed_task()
                     if active_task:
                         print(
-                            f"⏳ A task is already being processed (# {active_task['id']}). Waiting..."
+                            f"⏳ A task is already being processed (# {active_task['id']}). "
+                            "Waiting..."
                         )
                     else:
                         # 3. Process the next pending task

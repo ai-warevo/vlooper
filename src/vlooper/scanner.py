@@ -1,3 +1,4 @@
+"""Scanner module to find issues and PRs using GitHub CLI."""
 import json
 import subprocess
 
@@ -15,15 +16,20 @@ def run_command(cmd):
 
 
 class Scanner:
+    """Scanner to find issues and Pull Requests assigned to the bot."""
+
     def __init__(self, db: Database):
+        """Initialize the scanner with a database instance."""
         self.db = db
 
     def scan(self):
+        """Perform periodic scanning of organization for new tasks."""
         print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
         self._scan_issues()
         self._scan_prs()
 
     def _scan_issues(self):
+        """Scan for open issues assigned to the bot."""
         search_issues_cmd = [
             "gh",
             "search",
@@ -53,6 +59,7 @@ class Scanner:
             self.db.add_task("ISSUE", repo_full_name, branch_name)
 
     def _scan_prs(self):
+        """Scan for open Pull Requests assigned to the bot."""
         search_prs_cmd = [
             "gh",
             "search",

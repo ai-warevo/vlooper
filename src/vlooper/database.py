@@ -1,17 +1,23 @@
+"""Database management for vLooper."""
 import sqlite3
 
 from vlooper.config import config
 
 
 class Database:
+    """SQLite database handler for tasks."""
+
     def __init__(self, db_path=config.db_path):
+        """Initialize the database with a given path."""
         self.db_path = db_path
         self._init_db()
 
     def _get_connection(self):
+        """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
 
     def _init_db(self):
+        """Initialize the database schema."""
         with self._get_connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -29,6 +35,7 @@ class Database:
             conn.commit()
 
     def add_task(self, task_type, repo_full_name, branch_name):
+        """Add a new task to the database."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
             return False
@@ -45,18 +52,21 @@ class Database:
         return True
 
     def get_pending_tasks(self):
+        """Retrieve all pending tasks."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
             return cursor.fetchall()
 
     def get_all_tasks(self):
+        """Retrieve all tasks from the database."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM tasks")
             return cursor.fetchall()
 
     def claim_task(self, task_id):
+        """Claim a task for processing."""
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
@@ -70,6 +80,7 @@ class Database:
             return cursor.rowcount > 0
 
     def complete_task(self, task_id):
+        """Mark a task as completed."""
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -82,6 +93,7 @@ class Database:
             conn.commit()
 
     def fail_task(self, task_id, error_msg):
+        """Mark a task as failed and handle retries."""
         with self._get_connection() as conn:
             # Check retries
             cursor = conn.execute("SELECT retries FROM tasks WHERE id = ?", (task_id,))
@@ -90,7 +102,8 @@ class Database:
                 conn.execute(
                     """
                     UPDATE tasks 
-                    SET status = 'PENDING', retries = retries + 1, last_error = ?, updated_at = CURRENT_TIMESTAMP 
+                    SET status = 'PENDING', retries = retries + 1, last_error = ?, \
+updated_at = CURRENT_TIMESTAMP 
                     WHERE id = ?
                 """,
                     (error_msg, task_id),
@@ -107,12 +120,14 @@ class Database:
             conn.commit()
 
     def get_active_claimed_task(self):
+        """Get the currently active claimed task."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'CLAIMED'")
             return cursor.fetchone()
 
     def task_exists(self, repo_full_name, branch_name):
+        """Check if a task for a specific repo and branch already exists."""
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "SELECT 1 FROM tasks WHERE repo_full_name = ? AND branch_name = ?",
