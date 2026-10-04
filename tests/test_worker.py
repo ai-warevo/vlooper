@@ -38,8 +38,14 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "execution_timeout", 5)
 
     def side_effect_run(cmd, cwd=None, timeout=None):
+        import os
         cmd_str = " ".join(cmd)
         if "gh repo clone" in cmd_str:
+            # target is the last argument
+            target = cmd[-1]
+            base = cwd if cwd else "."
+            target_path = os.path.join(base, target)
+            os.makedirs(target_path, exist_ok=True)
             return "success", None
         if any(x in cmd_str for x in ["git checkout", "git pull", "git checkout -B"]):
             return "", None
@@ -51,9 +57,9 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
 
     with (
         patch("vlooper.worker.run_command", side_effect=side_effect_run),
+        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
         patch.object(Worker, "_get_context", return_value="test context"),
     ):
-
         success = worker.process_next_task()
         assert success is True
 
@@ -113,7 +119,7 @@ def test_get_context_issue(worker, db, monkeypatch):
         {"comments": [{"author": {"login": "user1"}, "body": "comment 1"}]}
     )
 
-    def mock_run(cmd, capture_output=True, text=True):
+    def mock_run(cmd, *args, **kwargs):
         cmd_str = " ".join(cmd)
         if "gh issue view" in cmd_str and "--json title,body" in cmd_str:
             return mock_view_json, None
@@ -121,7 +127,10 @@ def test_get_context_issue(worker, db, monkeypatch):
             return mock_comments_json, None
         return "", None
 
-    with patch("vlooper.worker.run_command", side_effect=mock_run):
+    with (
+        patch("vlooper.worker.run_command", side_effect=mock_run),
+        patch("vlooper.github_client.run_command", side_effect=mock_run),
+    ):
         context = worker._get_context(task, "org/repo")
         assert context is not None
         assert "My Issue" in context

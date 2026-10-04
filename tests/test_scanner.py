@@ -2,7 +2,7 @@
 """Tests for the Scanner class."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -35,13 +35,14 @@ def test_scan_issues(scanner, db, monkeypatch):
         }
     ]
 
-    def mock_run(cmd, capture_output=True, text=True):
+    def mock_run(cmd, *args, **kwargs):
         # Check if the call is for gh search issues
+        from subprocess import CompletedProcess
         if "gh" in cmd and "search" in cmd and "type:issue" in cmd:
-            return MagicMock(returncode=0, stdout=json.dumps(mock_issues), stderr="")
-        return MagicMock(returncode=1, stdout="", stderr="Not a search command")
+            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_issues), stderr="")
+        return CompletedProcess(args=[], returncode=1, stdout="", stderr="Not a search command")
 
-    with patch("subprocess.run", side_effect=mock_run):
+    with patch("vlooper.utils.subprocess.run", side_effect=mock_run):
         scanner.scan()
 
     # Verify task was added to DB
@@ -64,16 +65,16 @@ def test_scan_prs(scanner, db, monkeypatch):
     ]
     mock_pr_details = {"headRefName": "feature-xyz"}
 
-    def mock_run(cmd, capture_output=True, text=True):
+    def mock_run(cmd, *args, **kwargs):
+        # Check if the call is for gh search prs, 2. get branch details via gh pr view
+        from subprocess import CompletedProcess
         if "gh" in cmd and "search" in cmd and "type:pr" in cmd:
-            return MagicMock(returncode=0, stdout=json.dumps(mock_prs), stderr="")
+            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_prs), stderr="")
         if "gh" in cmd and "pr" in cmd and "view" in cmd:
-            return MagicMock(
-                returncode=0, stdout=json.dumps(mock_pr_details), stderr=""
-            )
-        return MagicMock(returncode=1, stdout="", stderr="Unknown command")
+            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_pr_details), stderr="")
+        return CompletedProcess(args=[], returncode=1, stdout="", stderr="Unknown command")
 
-    with patch("subprocess.run", side_effect=mock_run):
+    with patch("vlooper.utils.subprocess.run", side_effect=mock_run):
         scanner.scan()
 
     # Verify task was added to DB

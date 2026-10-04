@@ -5,6 +5,7 @@ import subprocess
 
 def run_command(cmd, cwd=None, timeout=None):
     """Run a shell command with an optional timeout."""
+    print(f"DEBUG: running command {cmd}")
     try:
         res = subprocess.run(
             cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False
@@ -14,7 +15,9 @@ def run_command(cmd, cwd=None, timeout=None):
                 f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{res.stdout}\n"
                 f"STDERR:\n{res.stderr}"
             )
+            print(f"DEBUG: command failed with error: {error_msg}")
             return None, error_msg
+        print(f"DEBUG: command success, stdout length: {len(res.stdout)}")
         return res.stdout.strip(), None
     except subprocess.TimeoutExpired as e:
         stdout = e.stdout.decode() if e.stdout else ""
