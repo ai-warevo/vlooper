@@ -25,7 +25,7 @@ class VLooperTUI(App):
     }
     """
 
-    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [("q", "quit", "Quit")]
+    BINDINGS: ClassVar = [("q", "quit", "Quit")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -67,7 +67,7 @@ class VLooperTUI(App):
         except Exception as e:  # noqa: BLE001
             self.status_label.update(f"⚠️ Error loading data: {e}")
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         self.exit()
 
 

@@ -50,6 +50,12 @@ class Database:
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
             return cursor.fetchall()
 
+    def get_all_tasks(self):
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks")
+            return cursor.fetchall()
+
     def claim_task(self, task_id):
         with self._get_connection() as conn:
             cursor = conn.execute(
