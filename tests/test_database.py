@@ -1,4 +1,3 @@
-
 import pytest
 
 from vlooper.config import config
