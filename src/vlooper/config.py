@@ -1,10 +1,14 @@
 import os
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 @dataclass
 class Config:
     org_name: str = os.environ.get("ORG_NAME", "ai-warevo")
-    bot_username: str = os.environ.get("BOT_USERNAME", "your_bot_login") # User should set this via env
+    bot_username: str = os.environ.get("BOT_USERNAME", "your_bot_login")
     model: str = os.environ.get("MODEL", "ollama/gemma")
     test_command: str = os.environ.get("TEST_COMMAND", "./test.sh")
     db_path: str = os.environ.get("DB_PATH", "vlooper.db")
