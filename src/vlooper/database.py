@@ -59,11 +59,18 @@ class Database:
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
             return cursor.fetchall()
 
-    def get_failed_tasks(self):
-        """Retrieve all failed tasks from the database."""
+    def get_failed_tasks(self, min_age_seconds: int = 0):
+        """Retrieve failed tasks from the database that are older than min_age_seconds."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'FAILED'")
+            query = "SELECT * FROM tasks WHERE status = 'FAILED'"
+            params = []
+            if min_age_seconds > 0:
+                # SQLite datetime comparison
+                query += " AND updated_at < datetime('now', ?)"
+                params.append(f"-{min_age_seconds} seconds")
+            
+            cursor = conn.execute(query, params)
             return cursor.fetchall()
 
     def get_all_tasks(self):
@@ -74,10 +81,10 @@ class Database:
             return cursor.fetchall()
 
     def reset_task_status(self, task_id):
-        """Reset a task's status to PENDING without resetting retry count."""
+        """Reset a task's status to PENDING and reset its retry count."""
         with self._get_connection() as conn:
             conn.execute(
-                "UPDATE tasks SET status = 'PENDING' WHERE id = ?",
+                "UPDATE tasks SET status = 'PENDING', retries = 0 WHERE id = ?",
                 (task_id,),
             )
             conn.commit()

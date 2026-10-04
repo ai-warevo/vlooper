@@ -17,21 +17,21 @@ class Scanner:  # pylint: disable=too-few-public-methods
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
         if retry_failed:
-            print("🔄 Mode: Retrying failed tasks from database...")
+            print("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
-        else:
-            print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
-            self._scan_issues()
-            self._scan_prs()
+
+        print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
+        self._scan_issues()
+        self._scan_prs()
 
     def _retry_failed_tasks(self):
-        """Retrieve failed tasks from DB and set them back to PENDING."""
-        failed_tasks = self.db.get_failed_tasks()
+        """Retrieve stale failed tasks from DB and reset them."""
+        # 300 seconds = 5 minutes cooldown to prevent rapid retry loops for failing tasks.
+        failed_tasks = self.db.get_failed_tasks(min_age_seconds=300)
         if not failed_tasks:
-            print("ℹ️ No failed tasks found currently.")
             return
 
-        print(f"♻️ Found {len(failed_tasks)} failed tasks. Resetting them...")
+        print(f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them...")
         for task in failed_tasks:
             self.db.reset_task_status(task["id"])
             print(f"   ✅ Task #{task['id']} reset to PENDING.")
