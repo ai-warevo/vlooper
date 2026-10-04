@@ -67,7 +67,7 @@ class Worker:
         self._post_github_comment(task, "🤖 vLooper has picked up this task.")
 
         try:
-            success = self._execute_task(task)
+            success = self._execute_task(task, task_id)
             if success:
                 self.db.complete_task(task_id)
                 # Post finishing comment (for issues)
@@ -83,7 +83,7 @@ class Worker:
 
         return True
 
-    def _execute_task(self, task):
+    def _execute_task(self, task, task_id):
         repo_full_name = task['repo_full_name']
         branch_name = task['branch_name']
         task_type = task['task_type']
@@ -152,6 +152,7 @@ class Worker:
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
                 current_context += f"\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+                self.db.fail_task(task_id, err)
                 continue
 
             # Step B (Verify)
@@ -168,6 +169,7 @@ class Worker:
                 # Step C (Evaluate/Feedback) - Failure
                 print(f"❌ Tests failed on attempt {attempt}.")
                 current_context += f"\nThe previous attempt failed with the following errors:\n{test_err}\nPlease fix these issues and try again."
+                self.db.fail_task(task_id, test_err)
 
         if not success:
             raise Exception(f"Task failed after {config.max_retries} retries.")

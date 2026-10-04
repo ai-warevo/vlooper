@@ -3,8 +3,10 @@ import os
 import json
 import shlex
 import sqlite3
+from unittest.mock import patch
 from vlooper.config import config
 from vlooper.database import Database
+from vlooper.worker import Worker
 
 @pytest.fixture
 def db(tmp_path):

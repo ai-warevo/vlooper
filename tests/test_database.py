@@ -5,10 +5,10 @@ from vlooper.config import config
 import os
 
 @pytest.fixture
-def db():
-    # Use an in-memory database for testing to ensure isolation and speed
-    test_db = Database(db_path=":memory:")
-    return test_db
+def db(tmp_path):
+    # Use a temporary file for database testing to ensure isolation and persistence within the test session
+    db_file = tmp_path / "test.db"
+    return Database(db_path=str(db_file))
 
 def test_db_init(db):
     # Verify table creation by attempting a query
