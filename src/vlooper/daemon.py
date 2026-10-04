@@ -1,13 +1,16 @@
-import time
+import fcntl
 import signal
 import sys
-import os
-import fcntl
+import time
+
 from vlooper.database import Database
 from vlooper.scanner import Scanner
 from vlooper.worker import Worker
 
+
 class VLooperDaemon:
+    """The main daemon process for vLooper."""
+
     def __init__(self):
         self.db = Database()
         self.scanner = Scanner(self.db)
@@ -19,49 +22,52 @@ class VLooperDaemon:
         signal.signal(signal.SIGINT, self._handle_exit)
         signal.signal(signal.SIGTERM, self._handle_exit)
 
-    def _handle_exit(self, signum, frame):
+    def _handle_exit(self, signum: int, frame):
+        """Handle exit signal."""
         print("\n🛑 Stopping daemon...")
         self.running = False
 
     def run(self):
+        """Main execution loop."""
         # Attempt to acquire an exclusive lock on the lock file
-        lock_fd = open(self.lock_file, 'w')
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except IOError:
-            print("❌ Another instance of vLooper is already running. Exiting.")
-            sys.exit(1)
-
-        print("🚀 vLooper Daemon started with lock acquired.")
-        while self.running:
+        with open(self.lock_file, "w") as lock_fd:
             try:
-                # 1. Scan for new tasks
-                self.scanner.scan()
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                print("❌ Another instance of vLooper is already running. Exiting.")
+                sys.exit(1)
 
-                # 2. Check if a worker is already active (as a secondary check)
-                active_task = self.db.get_active_claimed_task()
-                if active_task:
-                    print(f"⏳ A task is already being processed (# {active_task['id']}). Waiting...")
-                else:
-                    # 3. Process the next pending task
-                    success = self.worker.process_next_task()
-                    if not success:
-                        # No tasks found or error occurred, but we continue loop
-                        pass
+            print("🚀 vLooper Daemon started with lock acquired.")
+            while self.running:
+                try:
+                    # 1. Scan for new tasks
+                    self.scanner.scan()
 
-                # Sleep to avoid hammering everything
-                time.sleep(30)
+                    # 2. Check if a worker is already active (as a secondary check)
+                    active_task = self.db.get_active_claimed_task()
+                    if active_task:
+                        print(
+                            f"⏳ A task is already being processed (# {active_task['id']}). Waiting..."
+                        )
+                    else:
+                        # 3. Process the next pending task
+                        self.worker.process_next_task()
 
-            except Exception as e:
-                print(f"⚠️ Unexpected error in daemon loop: {e}")
-                time.sleep(10)
-        
-        lock_fd.close()
+                    # Sleep to avoid hammering everything
+                    time.sleep(30)
+
+                except Exception as e:
+                    print(f"⚠️ Unexpected error in daemon loop: {e}")
+                    time.sleep(10)
+
         print("👋 Daemon shut down.")
 
+
 def main():
+    """Entry point for the daemon."""
     daemon = VLooperDaemon()
     daemon.run()
+
 
 if __name__ == "__main__":
     main()

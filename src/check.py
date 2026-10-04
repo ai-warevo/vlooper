@@ -1,22 +1,27 @@
-"""Скрипт для запуска всех линтеров и проверок одной командой."""
+"""Script to run all linters and checks in one command."""
 
 import subprocess
 import sys
 
 
 def run_command(command: list[str]) -> int:
-    """Запускает системную команду и возвращает её код возврата."""
-    print(f"▶️ Запуск: {' '.join(command)}...")
-    result = subprocess.run(command, check=False)
-    if result.returncode == 0:
-        print("✅ Успешно!\n")
-    else:
-        print(f"❌ Ошибка! Код возврата: {result.returncode}\n")
-    return result.returncode
+    """Runs a system command and returns its return code."""
+    print(f"▶️ Running: {' '.join(command)}...")
+    try:
+        result = subprocess.run(command, check=False)
+        if result.returncode == 0:
+            print("✅ Success!")
+            return 0
+        else:
+            print(f"❌ Error! Return code: {result.returncode}")
+            return result.returncode
+    except OSError as e:
+        print(f"❌ Failed to run command: {e}")
+        return 1
 
 
 def main() -> None:
-    """Последовательно запускает весь стек проверок кода."""
+    """Sequentially runs the entire code check stack."""
     commands = [
         ["black", "--check", "src", "tests"],
         ["ruff", "check", "src", "tests"],
@@ -31,10 +36,10 @@ def main() -> None:
             has_errors = True
 
     if has_errors:
-        print("🚨 Некоторые проверки провалены!")
+        print("🚨 Some checks failed!")
         sys.exit(1)
     else:
-        print("🎉 Все проверки успешно пройдены! Код идеален. ✨")
+        print("🎉 All checks passed! Code is perfect. ✨")
 
 
 if __name__ == "__main__":

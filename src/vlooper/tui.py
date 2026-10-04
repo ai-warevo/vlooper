@@ -1,10 +1,8 @@
-import asyncio
-import sqlite3
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static
-from textual.containers import Container
+from textual.widgets import DataTable, Footer, Header, Static
+
 from vlooper.database import Database
-from vlooper.config import config
+
 
 class VLooperTUI(App):
     CSS = """
@@ -46,7 +44,9 @@ class VLooperTUI(App):
             # Update Status Panel
             active = self.db.get_active_claimed_task()
             if active:
-                status_text = f"🚀 WORKING ON: #{active['id']} ({active['repo_full_name']})"
+                status_text = (
+                    f"🚀 WORKING ON: #{active['id']} ({active['repo_full_name']})"
+                )
             else:
                 status_text = "💤 IDLE - Waiting for tasks..."
             self.status_label.update(status_text)
@@ -56,17 +56,18 @@ class VLooperTUI(App):
             self.table.clear()
             for t in tasks:
                 self.table.add_row(
-                    str(t['id']),
-                    t['task_type'],
-                    t['repo_full_name'].split('/')[-1],
-                    t['branch_name'],
-                    t['status']
+                    str(t["id"]),
+                    t["task_type"],
+                    t["repo_full_name"].split("/")[-1],
+                    t["branch_name"],
+                    t["status"],
                 )
         except Exception as e:
             self.status_label.update(f"⚠️ Error loading data: {e}")
 
     def action_quit(self) -> None:
         self.exit()
+
 
 if __name__ == "__main__":
     app = VLooperTUI()

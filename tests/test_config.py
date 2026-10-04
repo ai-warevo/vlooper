@@ -1,7 +1,8 @@
-import pytest
-import os
 import importlib
+import os
+
 from vlooper import config as config_module
+
 
 def test_config_defaults(monkeypatch):
     # Set environment variables to their default values to ensure they are used
@@ -17,19 +18,20 @@ def test_config_defaults(monkeypatch):
 
     importlib.reload(config_module)
     c = config_module.config
-    
+
     assert c.org_name == "ai-warevo"
     assert c.bot_username == "your_bot_login"
     assert c.model == "ollama/gemma"
+
 
 def test_config_env_override(monkeypatch):
     monkeypatch.setenv("ORG_NAME", "custom-org")
     monkeypatch.setenv("BOT_USERNAME", "tester")
     monkeypatch.setenv("MAX_RETRIES", "5")
-    
+
     importlib.reload(config_module)
     c = config_module.config
-    
+
     assert c.org_name == "custom-org"
     assert c.bot_username == "tester"
     assert c.max_retries == 5

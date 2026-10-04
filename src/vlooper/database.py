@@ -1,6 +1,7 @@
 import sqlite3
-from datetime import datetime
+
 from vlooper.config import config
+
 
 class Database:
     def __init__(self, db_path=config.db_path):
@@ -31,12 +32,15 @@ class Database:
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
             return False
-            
+
         with self._get_connection() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO tasks (task_type, repo_full_name, branch_name, status)
                 VALUES (?, ?, ?, 'PENDING')
-            """, (task_type, repo_full_name, branch_name))
+            """,
+                (task_type, repo_full_name, branch_name),
+            )
             conn.commit()
         return True
 
@@ -48,21 +52,27 @@ class Database:
 
     def claim_task(self, task_id):
         with self._get_connection() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 UPDATE tasks 
                 SET status = 'CLAIMED', updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ? AND (status = 'PENDING' OR (status = 'FAILED' AND retries < ?))
-            """, (task_id, config.max_retries))
+            """,
+                (task_id, config.max_retries),
+            )
             conn.commit()
             return cursor.rowcount > 0
 
     def complete_task(self, task_id):
         with self._get_connection() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE tasks 
                 SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
-            """, (task_id,))
+            """,
+                (task_id,),
+            )
             conn.commit()
 
     def fail_task(self, task_id, error_msg):
@@ -71,17 +81,23 @@ class Database:
             cursor = conn.execute("SELECT retries FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
             if row and row[0] < config.max_retries:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE tasks 
                     SET status = 'PENDING', retries = retries + 1, last_error = ?, updated_at = CURRENT_TIMESTAMP 
                     WHERE id = ?
-                """, (error_msg, task_id))
+                """,
+                    (error_msg, task_id),
+                )
             else:
-                conn.execute("""
+                conn.execute(
+                    """
                     UPDATE tasks 
                     SET status = 'FAILED', last_error = ?, updated_at = CURRENT_TIMESTAMP 
                     WHERE id = ?
-                """, (error_msg, task_id))
+                """,
+                    (error_msg, task_id),
+                )
             conn.commit()
 
     def get_active_claimed_task(self):
@@ -93,7 +109,7 @@ class Database:
     def task_exists(self, repo_full_name, branch_name):
         with self._get_connection() as conn:
             cursor = conn.execute(
-                "SELECT 1 FROM tasks WHERE repo_full_name = ? AND branch_name = ?", 
-                (repo_full_name, branch_name)
+                "SELECT 1 FROM tasks WHERE repo_full_name = ? AND branch_name = ?",
+                (repo_full_name, branch_name),
             )
             return cursor.fetchone() is not None
