@@ -9,7 +9,7 @@ from vlooper.scanner import Scanner
 from vlooper.worker import Worker
 
 
-class VLooperDaemon:
+class VLooperDaemon:  # pylint: disable=too-few-public-methods
     """The main daemon process for vLooper."""
 
     def __init__(self):
@@ -58,7 +58,7 @@ class VLooperDaemon:
                     # Sleep to avoid hammering everything
                     time.sleep(30)
 
-                except Exception as e:  # noqa: BLE001
+                except Exception as e:  # noqa: W0718
                     print(f"⚠️ Unexpected error in daemon loop: {e}")
                     time.sleep(10)
 

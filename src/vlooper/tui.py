@@ -79,7 +79,7 @@ class VLooperTUI(App):
                         t["branch_name"],
                         t["status"],
                     )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: W0718
             if self.status_label:
                 self.status_label.update(f"⚠️ Error loading data: {e}")
 

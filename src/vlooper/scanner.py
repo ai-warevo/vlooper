@@ -1,21 +1,12 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 import json
-import subprocess
 
 from vlooper.config import config
 from vlooper.database import Database
+from vlooper.utils import run_command
 
 
-def run_command(cmd):
-    """Helper to run shell commands."""
-    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if res.returncode != 0:
-        print(f"Command failed: {' '.join(cmd)}\nError: {res.stderr}")
-        return None
-    return res.stdout.strip()
-
-
-class Scanner:
+class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
 
     def __init__(self, db: Database):
@@ -41,8 +32,8 @@ class Scanner:
             "--json",
             "number,title,body,repository",
         ]
-        issues_json = run_command(search_issues_cmd)
-        if not issues_json:
+        issues_json, err = run_command(search_issues_cmd)
+        if err or not issues_json:
             return
 
         try:
@@ -71,8 +62,8 @@ class Scanner:
             "--json",
             "number,title,body,repository",
         ]
-        prs_json = run_command(search_prs_cmd)
-        if not prs_json:
+        prs_json, err = run_command(search_prs_cmd)
+        if err or not prs_json:
             return
 
         try:
@@ -96,8 +87,8 @@ class Scanner:
                 "--json",
                 "headRefName",
             ]
-            pr_details_json = run_command(pr_details_cmd)
-            if not pr_details_json:
+            pr_details_json, err = run_command(pr_details_cmd)
+            if err or not pr_details_json:
                 continue
 
             try:
