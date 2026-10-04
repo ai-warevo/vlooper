@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name,protected-access,unused-argument
 """Tests for the Scanner class."""
+
 import json
 from unittest.mock import MagicMock, patch
 

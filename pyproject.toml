@@ -44,7 +44,7 @@ module = "tests.*"
 ignore_missing_imports = true
 
 [tool.black]
-target-version = ["py314"]
+target-version = ["py312"]
 
 [tool.pylint.messages_control]
 disable = [

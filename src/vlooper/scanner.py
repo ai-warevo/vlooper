@@ -1,4 +1,5 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
+
 import json
 
 from vlooper.config import config

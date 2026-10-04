@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name,protected-access,unused-argument
 """Tests for the application."""
+
 import pytest
 
 from vlooper.config import config

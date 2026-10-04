@@ -1,5 +1,6 @@
 # pylint: disable=redefined-outer-name,protected-access,unused-argument
 """Tests for the Worker class."""
+
 import json
 import sqlite3
 from unittest.mock import patch

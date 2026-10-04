@@ -1,4 +1,5 @@
 """Database management for vLooper."""
+
 import sqlite3
 
 from vlooper.config import config

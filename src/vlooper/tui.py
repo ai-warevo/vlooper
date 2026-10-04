@@ -1,4 +1,5 @@
 """Textual TUI for vLooper."""
+
 from typing import ClassVar
 
 from textual.app import App, ComposeResult

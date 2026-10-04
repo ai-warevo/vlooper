@@ -1,12 +1,12 @@
 """Worker module to execute tasks via OpenCode."""
-import json
+
 import os
 import shlex
 
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
-from vlooper.github_client import get_pr_details
+from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
 from vlooper.utils import run_command
 
 
@@ -30,15 +30,22 @@ class Worker:  # pylint: disable=too-few-public-methods
                 if len(parts) >= 2:
                     num = parts[-1]
                     comment_cmd = [
-                        "gh", "issue", "comment", str(num),
-                        "--repo", repo_full_name,
-                        "--body", message,
+                        "gh",
+                        "issue",
+                        "comment",
+                        str(num),
+                        "--repo",
+                        repo_full_name,
+                        "--body",
+                        message,
                     ]
                     _, err = run_command(comment_cmd)
                     if err:
                         print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
                 else:
-                    print(f"⚠️ Could not find issue number in branch name: {branch_name}")
+                    print(
+                        f"⚠️ Could not find issue number in branch name: {branch_name}"
+                    )
             except Exception as e:  # noqa: W0718
                 print(f"⚠️ Error posting GitHub comment: {e}")
         elif task_type == "PR":
@@ -192,9 +199,16 @@ class Worker:  # pylint: disable=too-few-public-methods
                 )
 
             opencode_cmd = [
-                "opencode", "run", "--model", config.model, "--prompt", current_context,
+                "opencode",
+                "run",
+                "--model",
+                config.model,
+                "--prompt",
+                current_context,
             ]
-            _, err = run_command(opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+            _, err = run_command(
+                opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout
+            )
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
                 current_context += (
@@ -206,7 +220,9 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             test_cmd = shlex.split(config.test_command)
             print(f"🧪 Running tests: {config.test_command}")
-            _, test_err = run_command(test_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+            _, test_err = run_command(
+                test_cmd, cwd=repo_dir, timeout=config.execution_timeout
+            )
 
             if test_err is None:
                 print(f"🎉 Tests passed on attempt {attempt}!")
@@ -226,8 +242,14 @@ class Worker:  # pylint: disable=too-few-public-methods
     def _commit_and_push(self, repo_dir, branch_name, commit_msg):
         print("💾 Committing changes...")
         commit_cmd = [
-            "git", "-c", "user.name=AI OpenCode Bot", "-c", "user.email=ai-bot@://github.com",
-            "commit", "-am", commit_msg,
+            "git",
+            "-c",
+            "user.name=AI OpenCode Bot",
+            "-c",
+            "user.email=ai-bot@://github.com",
+            "commit",
+            "-am",
+            commit_msg,
         ]
         _, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.execution_timeout)
         if err:
@@ -242,13 +264,13 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _create_pr(self, repo_full_name, repo_dir, branch_name):
         print("📢 Creating Pull Request...")
-        pr_create_cmd = [
-            "gh", "pr", "create",
-            "--repo", repo_full_name,
-            "--title", f"Fix for {branch_name}",
-            "--body", "Automated fix by vLooper agent.",
-        ]
-        _, err = run_command(pr_create_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+        _, err = create_pull_request(
+            repo_full_name,
+            f"Fix for {branch_name}",
+            "Automated fix by vLooper agent.",
+            cwd=repo_dir,
+            timeout=config.execution_timeout,
+        )
         if err:
             raise VLooperError(err)
 
@@ -259,40 +281,23 @@ class Worker:  # pylint: disable=too-few-public-methods
         return self._get_pr_context(task, repo_full_name)
 
     def _get_issue_context(self, task, repo_full_name):
-        num = task["branch_name"].split("-")[-1] if "-" in task["branch_name"] else "unknown"
-        try:
-            view_cmd = [
-                "gh", "issue", "view", str(num),
-                "--repo", repo_full_name,
-                "--json", "title,body",
-            ]
-            res, err = run_command(view_cmd)
-            if err:
-                return None
-            issue_data = json.loads(res)
-            title = issue_data["title"]
-            body = issue_data["body"] or ""
-
-            comments_cmd = [
-                "gh", "issue", "view", str(num),
-                "--repo", repo_full_name,
-                "--json", "comments",
-            ]
-            res_c, err_c = run_command(comments_cmd)
-            if not err_c and res_c:
-                comments = json.loads(res_c).get("comments", [])
-                comments_text = "\n".join(
-                    [f"Комментарий от {c['author']['login']}: {c['body']}" for c in comments]
-                )
-            else:
-                comments_text = ""
-
-            return (
-                f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
-                f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
-            )
-        except Exception:  # noqa: W0718
+        num = (
+            task["branch_name"].split("-")[-1]
+            if "-" in task["branch_name"]
+            else "unknown"
+        )
+        if num == "unknown":
             return None
+
+        details = get_issue_details(num, repo_full_name)
+        if not details:
+            return None
+        title, body, comments_text = details
+
+        return (
+            f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
+            f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
+        )
 
     def _get_pr_context(self, task, repo_full_name):
         try:

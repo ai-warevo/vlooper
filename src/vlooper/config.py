@@ -1,4 +1,5 @@
 """Configuration management for vlooper."""
+
 import os
 from dataclasses import dataclass, field
 
@@ -11,6 +12,7 @@ load_dotenv()
 @dataclass
 class Config:  # pylint: disable=too-many-instance-attributes
     """Configuration settings loaded from environment variables."""
+
     org_name: str = field(
         default_factory=lambda: os.environ.get("ORG_NAME", "ai-warevo")
     )
