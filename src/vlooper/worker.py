@@ -30,10 +30,7 @@ class Worker:  # pylint: disable=too-few-public-methods
                     return  # Skip if we can't find human-readable issue number in branch
             except Exception:  # noqa: W0718
                 return
-        else:
-            # For PRs, this is handled by different logic or requires more state.
-            # Providing a fallback mechanism.
-            return
+        return  # For PRs, this is handled by different logic or requires more state.
 
         comment_cmd = [
             "gh",
@@ -140,12 +137,16 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         if not os.path.exists(repo_dir):
             print(f"📦 Cloning repository {repo_full_name}...")
-            _, err = run_command(["gh", "repo", "clone", repo_full_name, repo_short_name], cwd=base_dir)
+            _, err = run_command(
+                ["gh", "repo", "clone", repo_full_name, repo_short_name], cwd=base_dir
+            )
             if err:
                 raise VLooperError(err)
 
         print("🧹 Resetting to main...")
-        _, err = run_command(["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout)
+        _, err = run_command(
+            ["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout
+        )
         if err:
             raise VLooperError(err)
 
@@ -213,6 +214,7 @@ class Worker:  # pylint: disable=too-few-public-methods
                 success = True
                 break
 
+            # Step C (Evaluate/Feedback) - Failure
             print(f"❌ Tests failed on attempt {attempt}.")
             current_context += (
                 f"\nThe previous attempt failed with the following errors:\n{test_err}"
@@ -255,8 +257,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         """Fetch context for the task from GitHub."""
         if task["task_type"] == "ISSUE":
             return self._get_issue_context(task, repo_full_name)
-        else:
-            return self._get_pr_context(task, repo_full_name)
+        return self._get_pr_context(task, repo_full_name)
 
     def _get_issue_context(self, task, repo_full_name):
         num = task["branch_name"].split("-")[-1] if "-" in task["branch_name"] else "unknown"
@@ -312,7 +313,6 @@ class Worker:  # pylint: disable=too-few-public-methods
             pr = prs[0]
 
             num = pr["number"]
-            title = pr["title"]
             body = pr["body"] or ""
 
             review_text = ""
