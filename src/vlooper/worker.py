@@ -110,10 +110,6 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _post_escalation_comment(self, task, last_error):
         """Post a final failure comment tagging the user."""
-        repo_full_name = task["repo_full_name"]
-        task_type = task["task_type"]
-        branch_name = task["branch_name"]
-
         # In a real scenario, we'd fetch the actual author's login.
         # For now, let's use @assignee as requested by user logic.
         mention = "@assignee"
