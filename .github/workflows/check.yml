@@ -1,0 +1,30 @@
+name: check
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: black
+            command: black --check src tests
+          - name: ruff
+            command: ruff check src tests
+          - name: mypy
+            command: mypy src tests
+          - name: pylint-src
+            command: pylint src
+          - name: pylint-tests
+            command: pylint --disable=C0114,C0115,C0116,W0621,W0212,R0801 tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Run ${{ matrix.name }}
+        run: uv run ${{ matrix.command }}
