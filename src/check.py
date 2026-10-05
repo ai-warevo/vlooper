@@ -29,16 +29,10 @@ def main() -> None:
         ["pylint", "--disable=C0114,C0115,C0116,W0621,W0212,R0801", "tests"],
     ]
 
-    has_errors = False
     for cmd in commands:
         if run_command(cmd) != 0:
-            has_errors = True
-
-    if has_errors:
-        print("🚨 Some checks failed!")
-        sys.exit(1)
-    else:
-        print("🎉 All checks passed! Code is perfect. ✨")
+            print("🚨 Some checks failed!")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
