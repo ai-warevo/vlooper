@@ -2,7 +2,6 @@
 
 import os
 import shlex
-import sqlite3
 
 from vlooper.config import config
 from vlooper.database import Database
@@ -98,15 +97,7 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _is_terminal_failure(self, task_id) -> bool:
         """Check if the task has exhausted all retries."""
-        with self.db._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                "SELECT status, retries FROM tasks WHERE id = ?", (task_id,)
-            )
-            row = cursor.fetchone()
-            if row and row["status"] == "FAILED":
-                return row["retries"] >= config.max_retries
-        return False
+        return self.db.is_task_at_max_retries(task_id)
 
     def _post_escalation_comment(self, task, last_error):
         """Post a final failure comment tagging the user."""
