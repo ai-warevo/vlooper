@@ -155,13 +155,17 @@ class Worker:  # pylint: disable=too-few-public-methods
         if not success:
             raise VLooperError(f"Task failed after {config.max_retries} retries.")
 
-        # 5. Commit and Push
-        if not self._commit_and_push(repo_dir, branch_name, commit_msg):
-            return False
+        # 5 & 6. Commit, Push and Create PR (Delivery)
+        try:
+            if not self._commit_and_push(repo_dir, branch_name, commit_msg):
+                return False
 
-        # 6. Create PR if it was an issue
-        if task_type == "ISSUE":
-            self._create_pr(repo_full_name, repo_dir, branch_name)
+            # 6. Create PR if it was an issue
+            if task_type == "ISSUE":
+                self._create_pr(repo_full_name, repo_dir, branch_name)
+        except VLooperError as e:
+            self._stash_and_checkout_main(repo_dir)
+            raise e
 
         return True
 
@@ -311,6 +315,14 @@ class Worker:  # pylint: disable=too-few-public-methods
         )
         if err:
             raise VLooperError(err)
+
+    def _stash_and_checkout_main(self, repo_dir):
+        """Stash changes and checkout main if a push or PR creation fails."""
+        print("🧹 Stashing changes and checking out main...")
+        run_command(["git", "stash"], cwd=repo_dir)
+        _, err = run_command(["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout)
+        if err:
+            print(f"⚠️ Failed to checkout main during cleanup: {err}")
 
     def _get_context(self, task, repo_full_name):
         """Fetch context for the task from GitHub."""
