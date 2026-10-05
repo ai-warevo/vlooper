@@ -32,6 +32,12 @@ class Config:  # pylint: disable=too-many-instance-attributes
     execution_timeout: int = field(
         default_factory=lambda: int(os.environ.get("EXECUTION_TIMEOUT", "300"))
     )
+    git_user_name: str = field(
+        default_factory=lambda: os.environ.get("GIT_USER_NAME", "AI OpenCode Bot")
+    )
+    git_user_email: str = field(
+        default_factory=lambda: os.environ.get("GIT_USER_EMAIL", "ai-bot@://github.com")
+    )
     workspace_base_dir: str = field(
         default_factory=lambda: os.environ.get(
             "WORKSPACE_BASE_DIR", os.path.expanduser("~/ai_agent/workspace")

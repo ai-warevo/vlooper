@@ -69,7 +69,7 @@ class Database:
                 # SQLite datetime comparison
                 query += " AND updated_at < datetime('now', ?)"
                 params.append(f"-{min_age_seconds} seconds")
-            
+
             cursor = conn.execute(query, params)
             return cursor.fetchall()
 
@@ -142,6 +142,18 @@ updated_at = CURRENT_TIMESTAMP
                     (error_msg, task_id),
                 )
             conn.commit()
+
+    def is_task_at_max_retries(self, task_id) -> bool:
+        """Check if the task has exhausted all retries."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT status, retries FROM tasks WHERE id = ?", (task_id,)
+            )
+            row = cursor.fetchone()
+            if row and row["status"] == "FAILED":
+                return row["retries"] >= config.max_retries
+        return False
 
     def get_active_claimed_task(self):
         """Get the currently active claimed task."""

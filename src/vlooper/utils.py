@@ -3,6 +3,22 @@
 import subprocess
 
 
+def build_gh_view_cmd(
+    cmd_type: str, num: int, repo: str, fields: list[str]
+) -> list[str]:
+    """Строит базовую команду для gh issue view или gh pr view."""
+    return [
+        "gh",
+        cmd_type,  # "issue" или "pr"
+        "view",
+        str(num),
+        "--repo",
+        repo,
+        "--json",
+        *fields,
+    ]
+
+
 def run_command(cmd, cwd=None, timeout=None):
     """Run a shell command with an optional timeout."""
     print(f"DEBUG: running command {cmd}")
