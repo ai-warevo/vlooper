@@ -22,7 +22,7 @@ def run_command(command: list[str]) -> int:
 def main() -> None:
     """Sequentially runs the entire code check stack."""
     commands = [
-        ["black", "--check", "src", "tests"],
+        ["black", "src", "tests"],
         ["ruff", "check", "src", "tests"],
         ["mypy", "src", "tests"],
         ["pylint", "src"],

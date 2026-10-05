@@ -96,7 +96,8 @@ class Worker:  # pylint: disable=too-few-public-methods
                 mention = self._get_github_author(task)
                 pr_suffix = f" #{pr_number}" if pr_number else ""
                 self._post_github_comment(
-                    task, f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}"
+                    task,
+                    f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}",
                 )
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
@@ -337,7 +338,9 @@ class Worker:  # pylint: disable=too-few-public-methods
         """Stash changes and checkout main if a push or PR creation fails."""
         print("🧹 Stashing changes and checking out main...")
         run_command(["git", "stash"], cwd=repo_dir)
-        _, err = run_command(["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout)
+        _, err = run_command(
+            ["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout
+        )
         if err:
             print(f"⚠️ Failed to checkout main during cleanup: {err}")
 

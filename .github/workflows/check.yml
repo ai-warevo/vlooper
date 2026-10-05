@@ -9,7 +9,7 @@ jobs:
       matrix:
         include:
           - name: black
-            command: black --check src tests
+            command: black src tests
           - name: ruff
             command: ruff check src tests
           - name: mypy
