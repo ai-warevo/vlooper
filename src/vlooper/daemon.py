@@ -39,7 +39,9 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                 print("❌ Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
-            print(f"🚀 vLooper Daemon started with lock acquired. (Retry mode: {retry_failed})")
+            print(
+                f"🚀 vLooper Daemon started with lock acquired. (Retry mode: {retry_failed})"
+            )
             while self.running:
                 try:
                     # 1. Scan for new tasks

@@ -100,7 +100,9 @@ class Worker:  # pylint: disable=too-few-public-methods
         """Check if the task has exhausted all retries."""
         with self.db._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT status, retries FROM tasks WHERE id = ?", (task_id,))
+            cursor = conn.execute(
+                "SELECT status, retries FROM tasks WHERE id = ?", (task_id,)
+            )
             row = cursor.fetchone()
             if row and row["status"] == "FAILED":
                 return row["retries"] >= config.max_retries
@@ -114,7 +116,7 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         # In a real scenario, we'd fetch the actual author's login.
         # For now, let's use @assignee as requested by user logic.
-        mention = "@assignee" 
+        mention = "@assignee"
 
         msg = (
             f"🚨 **vLooper Escalation** 🚨\n\n"

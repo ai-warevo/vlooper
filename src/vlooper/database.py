@@ -69,7 +69,7 @@ class Database:
                 # SQLite datetime comparison
                 query += " AND updated_at < datetime('now', ?)"
                 params.append(f"-{min_age_seconds} seconds")
-            
+
             cursor = conn.execute(query, params)
             return cursor.fetchall()
 

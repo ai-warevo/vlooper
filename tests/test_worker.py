@@ -39,6 +39,7 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
 
     def side_effect_run(cmd, cwd=None, timeout=None):
         import os
+
         cmd_str = " ".join(cmd)
         if "gh repo clone" in cmd_str:
             # target is the last argument
