@@ -2,6 +2,7 @@
 
 import os
 import shlex
+import json
 
 from vlooper.config import config
 from vlooper.database import Database
@@ -88,13 +89,14 @@ class Worker:  # pylint: disable=too-few-public-methods
         self._post_github_comment(task, "🤖 vLooper has picked up this task.")
 
         try:
-            success = self._execute_task(task, task_id)
+            success, pr_number = self._execute_task(task, task_id)
             if success:
                 self.db.complete_task(task_id)
-                # Post finishing comment (for issues)
+                # Post finishing comment (for issues or PRs)
                 mention = self._get_github_author(task)
+                pr_suffix = f" #{pr_number}" if pr_number else ""
                 self._post_github_comment(
-                    task, f"✅ Task completed successfully! @{mention}"
+                    task, f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}"
                 )
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
@@ -138,17 +140,17 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         context = self._get_context(task, repo_full_name)
         if not context:
-            return False
+            return False, None
 
         commit_msg = self._generate_commit_message(task, branch_name)
 
         # 1 & 2 & 3. Setup workspace and branch
         repo_dir = self._prepare_repo_dir(repo_full_name, repo_short_name)
         if not repo_dir:
-            return False
+            return False, None
 
         if not self._setup_branch(repo_dir, branch_name, task_type):
-            return False
+            return False, None
 
         # 4. Run Opencode Loop
         success = self._run_opencode_loop(task, task_id, context, repo_dir)
@@ -156,18 +158,27 @@ class Worker:  # pylint: disable=too-few-public-methods
             raise VLooperError(f"Task failed after {config.max_retries} retries.")
 
         # 5 & 6. Commit, Push and Create PR (Delivery)
+        pr_number = None
         try:
             if not self._commit_and_push(repo_dir, branch_name, commit_msg):
-                return False
+                return False, None
 
             # 6. Create PR if it was an issue
             if task_type == "ISSUE":
-                self._create_pr(repo_full_name, repo_dir, branch_name)
+                pr_number = self._create_pr(repo_full_name, repo_dir, branch_name)
+            elif task_type == "PR":
+                # Try to find existing PR number for a refinement task
+                try:
+                    details = get_pr_details(repo_full_name, branch_name)
+                    if details:
+                        pr_number = details[0]
+                except Exception:
+                    pass
         except VLooperError as e:
             self._stash_and_checkout_main(repo_dir)
             raise e
 
-        return True
+        return True, pr_number
 
     def _generate_commit_message(self, task, branch_name):
         task_type = task["task_type"]
@@ -306,7 +317,7 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _create_pr(self, repo_full_name, repo_dir, branch_name):
         print("📢 Creating Pull Request...")
-        _, err = create_pull_request(
+        stdout, err = create_pull_request(
             repo_full_name,
             f"Fix for {branch_name}",
             "Automated fix by vLooper agent.",
@@ -315,6 +326,12 @@ class Worker:  # pylint: disable=too-few-public-methods
         )
         if err:
             raise VLooperError(err)
+
+        try:
+            return json.loads(stdout)["number"]
+        except Exception as e:
+            print(f"⚠️ Failed to parse PR number from output: {e}")
+            return None
 
     def _stash_and_checkout_main(self, repo_dir):
         """Stash changes and checkout main if a push or PR creation fails."""
