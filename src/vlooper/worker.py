@@ -1,6 +1,5 @@
 """Worker module to execute tasks via OpenCode."""
 
-import json
 import os
 import shlex
 
@@ -243,91 +242,77 @@ class Worker:  # pylint: disable=too-few-public-methods
                 raise VLooperError(err)
         return True
 
-    def _truncate_error(self, error_msg: str, lines: int = 50) -> str:
-        """Truncate the error message to keep only the last N lines."""
-        lines_list = error_msg.splitlines()
-        if len(lines_list) <= lines:
-            return error_msg
-        return "\n".join(lines_list[-lines:])
-
-    def _is_similar_error(self, err1: str, err2: str) -> bool:
-        """Check if two errors are similar (e.g., same traceback snippet)."""
-        return err1.strip() == err2.strip()
+    def _truncate_output(self, output: str, lines: int = 50) -> str:
+        """Truncate output to the last N lines."""
+        if not output:
+            return ""
+        output_lines = output.splitlines()
+        if len(output_lines) > lines:
+            return "\n".join(output_lines[-lines:])
+        return output
 
     def _run_opencode_loop(self, task, task_id, context, repo_dir):
-        current_context = context
+        """Run the agent-driven loop: Write -> Test -> Fix."""
+        ctx = context
         success = False
-        last_error = None
-        consecutive_errors = 0
-        max_attempts = 5  # Hard limit on self-correcting iterations
+        last_err_snip = None
+        consecutive_errs = 0
+        max_attempts = 5
 
-        for attempt in range(max_attempts):
-            if attempt > 0:
-                print(f"🔄 Attempt {attempt}/{max_attempts - 1}...")
+        for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                print(f"🔄 Attempt {attempt}/{max_attempts}...")
                 self._post_github_comment(
-                    task,
-                    f"🛠️ Attempt {attempt}/{max_attempts - 1} failed. Retrying...",
+                    task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
                 )
 
-            # 4. Timeouts: agent execution (90s)
+            # 1. Run Opencode (Agent execution) - Requirement 4: 90s timeout
+            print("🤖 Running Opencode agent...")
+            opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
             _, err = run_command(
-                ["opencode", "run", "--model", config.model, current_context],
-                cwd=repo_dir,
-                timeout=90,
+                opencode_cmd, cwd=repo_dir, timeout=90, truncate_lines=50
             )
+
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                truncated_err = self._truncate_error(err)
-                current_context += (
-                    f"\nThe previous attempt failed with the following errors:\n{truncated_err}"
-                    "\nPlease fix these issues and try again."
-                )
+                snip = self._truncate_output(err, lines=15)
+                consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
+                last_err_snip = snip
 
-                # 2. Anti-Stuck Protection
-                if last_error and truncated_err == last_error:
-                    consecutive_errors += 1
-                else:
-                    consecutive_errors = 0
-                    last_error = truncated_err
-
-                if consecutive_errors >= 2:
-                    print("🛑 Model seems stuck (repeated error). Breaking loop.")
+                if consecutive_errs >= 2:
+                    print("🚨 Agent stuck! Same error twice. Breaking loop.")
+                    self.db.fail_task(task_id, err)
                     break
 
+                ctx += f"\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
                 self.db.fail_task(task_id, err)
                 continue
 
-            # 4. Timeouts: tests (30s)
+            # 2. Run Tests - Requirement 4: 30s timeout
             print(f"🧪 Running tests: {config.test_command}")
             _, test_err = run_command(
-                shlex.split(config.test_command), cwd=repo_dir, timeout=30
+                shlex.split(config.test_command),
+                cwd=repo_dir,
+                timeout=30,
+                truncate_lines=50,
             )
 
             if test_err is None:
                 print(f"🎉 Tests passed on attempt {attempt}!")
-                success = True
-                break
+                return True
 
-            # 3. Log Truncation (Context Economy)
-            truncated_test_err = self._truncate_error(test_err, lines=50)
-
-            # 2. Anti-Stuck Protection
-            if last_error and truncated_test_err == last_error:
-                consecutive_errors += 1
-            else:
-                consecutive_errors = 0
-                last_error = truncated_test_err
-
-            if consecutive_errors >= 2:
-                print("🛑 Model seems stuck (repeated error). Breaking loop.")
-                break
-
-            # Step C (Evaluate/Feedback) - Failure
+            # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
-            current_context += (
-                f"\nThe previous attempt failed with the following errors:\n{truncated_test_err}"
-                "\nPlease fix these issues and try again."
-            )
+            snip = self._truncate_output(test_err, lines=15)
+            consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
+            last_err_snip = snip
+
+            if consecutive_errs >= 2:
+                print("🚨 Agent stuck! Same error twice. Breaking loop.")
+                self.db.fail_task(task_id, test_err)
+                break
+
+            ctx += f"\nThe previous attempt failed with the following errors:\n{test_err}\nPlease fix these issues and try again."
             self.db.fail_task(task_id, test_err)
 
         return success
