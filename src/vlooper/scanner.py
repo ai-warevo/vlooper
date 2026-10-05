@@ -4,7 +4,7 @@ import json
 
 from vlooper.config import config
 from vlooper.database import Database
-from vlooper.utils import run_command
+from vlooper.utils import build_gh_view_cmd, run_command
 
 
 class Scanner:  # pylint: disable=too-few-public-methods
@@ -94,16 +94,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             repo_full_name = pr["repository"]["nameWithOwner"]
 
             # Get the branch name for the PR
-            pr_details_cmd = [
-                "gh",
-                "pr",
-                "view",
-                str(num),
-                "--repo",
-                repo_full_name,
-                "--json",
-                "headRefName",
-            ]
+            pr_details_cmd = build_gh_view_cmd(
+                "pr", num, repo_full_name, ["headRefName"]
+            )
             pr_details_json, err = run_command(pr_details_cmd)
             if err or not pr_details_json:
                 continue

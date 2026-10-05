@@ -7,7 +7,7 @@ from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
 from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
-from vlooper.utils import run_command
+from vlooper.utils import build_gh_view_cmd, run_command
 
 
 class Worker:  # pylint: disable=too-few-public-methods
@@ -52,6 +52,20 @@ class Worker:  # pylint: disable=too-few-public-methods
             # For PRs, this is handled by different logic or requires more state.
             pass
 
+    def _get_github_author(self, task):
+        """Fetch the author of the issue/PR to mention them."""
+        repo_full_name = task["repo_full_name"]
+        if task["task_type"] == "ISSUE":
+            num = self._get_issue_number(task)
+            if num != "unknown" and num:
+                cmd = build_gh_view_cmd(
+                    "issue", num, repo_full_name, ["author", "--jq", ".author.login"]
+                )
+                stdout, err = run_command(cmd)
+                if not err and stdout:
+                    return stdout
+        return "assignee"
+
     def process_next_task(self):
         """Process the next pending task from the database."""
         tasks = self.db.get_pending_tasks()
@@ -78,7 +92,10 @@ class Worker:  # pylint: disable=too-few-public-methods
             if success:
                 self.db.complete_task(task_id)
                 # Post finishing comment (for issues)
-                self._post_github_comment(task, "✅ Task completed successfully!")
+                mention = self._get_github_author(task)
+                self._post_github_comment(
+                    task, f"✅ Task completed successfully! @{mention}"
+                )
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
                 raise VLooperError("Task execution failed (see logs).")
@@ -101,15 +118,13 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _post_escalation_comment(self, task, last_error):
         """Post a final failure comment tagging the user."""
-        # In a real scenario, we'd fetch the actual author's login.
-        # For now, let's use @assignee as requested by user logic.
-        mention = "@assignee"
+        mention = self._get_github_author(task)
 
         msg = (
             f"🚨 **vLooper Escalation** 🚨\n\n"
             f"I have attempted to solve this task {config.max_retries + 1} times but failed.\n"
             f"**Last Error:** `{last_error}`\n\n"
-            f"Please take manual action. {mention}"
+            f"Please take manual action. @{mention}"
         )
 
         self._post_github_comment(task, msg)
@@ -267,9 +282,9 @@ class Worker:  # pylint: disable=too-few-public-methods
         commit_cmd = [
             "git",
             "-c",
-            "user.name=AI OpenCode Bot",
+            f"user.name={config.git_user_name}",
             "-c",
-            "user.email=ai-bot@://github.com",
+            f"user.email={config.git_user_email}",
             "commit",
             "-am",
             commit_msg,
