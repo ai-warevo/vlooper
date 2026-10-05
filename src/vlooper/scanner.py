@@ -47,7 +47,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             "state:open",
             "is:issue",
             "--json",
-            "number,title,body,repository,type",
+            "number,title,body,repository,isPullRequest",
         ]
         issues_json, err = run_command(search_issues_cmd)
         if err or not issues_json:
@@ -60,7 +60,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         for issue in issues:
-            if issue.get("type") != "Issue":
+            if issue.get("isPullRequest"):
                 continue
 
             num = issue["number"]
@@ -80,7 +80,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             "state:open",
             "is:pr",
             "--json",
-            "number,title,body,repository,type",
+            "number,title,body,repository,isPullRequest",
         ]
         prs_json, err = run_command(search_prs_cmd)
         if err or not prs_json:
@@ -93,7 +93,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         for pr in prs:
-            if pr.get("type") != "PullRequest":
+            if not pr.get("isPullRequest"):
                 continue
 
             num = pr["number"]

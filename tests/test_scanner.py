@@ -33,7 +33,7 @@ def test_scan_issues(scanner, db, monkeypatch):
             "title": "Test Issue",
             "body": "Describe it",
             "repository": {"nameWithOwner": "org/repo1"},
-            "type": "Issue",
+            "isPullRequest": False,
         }
     ]
 
@@ -66,7 +66,7 @@ def test_scan_prs(scanner, db, monkeypatch):
             "title": "Test PR",
             "body": "PR body",
             "repository": {"nameWithOwner": "org/repo-pr"},
-            "type": "PullRequest",
+            "isPullRequest": True,
         }
     ]
     mock_pr_details = {"headRefName": "feature-xyz"}
