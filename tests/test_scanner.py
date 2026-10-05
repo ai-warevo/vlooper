@@ -33,13 +33,13 @@ def test_scan_issues(scanner, db, monkeypatch):
             "title": "Test Issue",
             "body": "Describe it",
             "repository": {"nameWithOwner": "org/repo1"},
+            "type": "Issue",
         }
     ]
 
     def mock_run(cmd, *args, **kwargs):
         # Check if the call is for gh search issues
-
-        if "gh" in cmd and "search" in cmd and "type:issue" in cmd:
+        if "gh" in cmd and "search" in cmd and "is:issue" in cmd:
             return CompletedProcess(
                 args=[], returncode=0, stdout=json.dumps(mock_issues), stderr=""
             )
@@ -66,6 +66,7 @@ def test_scan_prs(scanner, db, monkeypatch):
             "title": "Test PR",
             "body": "PR body",
             "repository": {"nameWithOwner": "org/repo-pr"},
+            "type": "PullRequest",
         }
     ]
     mock_pr_details = {"headRefName": "feature-xyz"}
@@ -73,7 +74,7 @@ def test_scan_prs(scanner, db, monkeypatch):
     def mock_run(cmd, *args, **kwargs):
         # Check if the call is for gh search prs, 2. get branch details via gh pr view
 
-        if "gh" in cmd and "search" in cmd and "type:pr" in cmd:
+        if "gh" in cmd and "search" in cmd and "is:pr" in cmd:
             return CompletedProcess(
                 args=[], returncode=0, stdout=json.dumps(mock_prs), stderr=""
             )

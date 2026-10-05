@@ -45,9 +45,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             f"org:{config.org_name}",
             f"assignee:{config.bot_username}",
             "state:open",
-            "type:issue",
+            "is:issue",
             "--json",
-            "number,title,body,repository",
+            "number,title,body,repository,type",
         ]
         issues_json, err = run_command(search_issues_cmd)
         if err or not issues_json:
@@ -60,6 +60,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         for issue in issues:
+            if issue.get("type") != "Issue":
+                continue
+
             num = issue["number"]
             repo_full_name = issue["repository"]["nameWithOwner"]
             # For issues, we might want a representative branch name or just use 'issue-{num}'
@@ -75,9 +78,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             f"org:{config.org_name}",
             f"assignee:{config.bot_username}",
             "state:open",
-            "type:pr",
+            "is:pr",
             "--json",
-            "number,title,body,repository",
+            "number,title,body,repository,type",
         ]
         prs_json, err = run_command(search_prs_cmd)
         if err or not prs_json:
@@ -90,6 +93,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         for pr in prs:
+            if pr.get("type") != "PullRequest":
+                continue
+
             num = pr["number"]
             repo_full_name = pr["repository"]["nameWithOwner"]
 
