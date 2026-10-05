@@ -38,7 +38,7 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "max_retries", 1)
     monkeypatch.setattr(config, "execution_timeout", 5)
 
-    def side_effect_run(cmd, cwd=None, timeout=None):
+    def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
 
         cmd_str = " ".join(cmd)
         if "gh repo clone" in cmd_str:
@@ -81,7 +81,7 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
     monkeypatch.setattr(config, "max_retries", 2)
     monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
 
-    def side_effect_run(cmd, cwd=None, timeout=None):
+    def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
         cmd_str = " ".join(cmd)
         if "opencode run" in cmd_str:
             return None, "Agent failed"
