@@ -93,7 +93,5 @@ def create_pull_request(repo_full_name, title, body, cwd=None, timeout=None):
         title,
         "--body",
         body,
-        "--json",
-        "number",
     ]
     return run_command(pr_create_cmd, cwd=cwd, timeout=timeout)

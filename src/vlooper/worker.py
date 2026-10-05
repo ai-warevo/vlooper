@@ -318,7 +318,7 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _create_pr(self, repo_full_name, repo_dir, branch_name):
         print("📢 Creating Pull Request...")
-        stdout, err = create_pull_request(
+        _, err = create_pull_request(
             repo_full_name,
             f"Fix for {branch_name}",
             "Automated fix by vLooper agent.",
@@ -328,11 +328,10 @@ class Worker:  # pylint: disable=too-few-public-methods
         if err:
             raise VLooperError(err)
 
-        try:
-            return json.loads(stdout)["number"]
-        except Exception as e:
-            print(f"⚠️ Failed to parse PR number from output: {e}")
-            return None
+        details = get_pr_details(repo_full_name, branch_name)
+        if details:
+            return details[0]
+        return None
 
     def _stash_and_checkout_main(self, repo_dir):
         """Stash changes and checkout main if a push or PR creation fails."""
