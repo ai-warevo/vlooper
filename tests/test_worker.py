@@ -2,6 +2,7 @@
 """Tests for the Worker class."""
 
 import json
+import os
 import sqlite3
 from unittest.mock import patch
 
@@ -38,7 +39,6 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "execution_timeout", 5)
 
     def side_effect_run(cmd, cwd=None, timeout=None):
-        import os
 
         cmd_str = " ".join(cmd)
         if "gh repo clone" in cmd_str:

@@ -2,6 +2,7 @@
 """Tests for the Scanner class."""
 
 import json
+from subprocess import CompletedProcess
 from unittest.mock import patch
 
 import pytest
@@ -37,7 +38,6 @@ def test_scan_issues(scanner, db, monkeypatch):
 
     def mock_run(cmd, *args, **kwargs):
         # Check if the call is for gh search issues
-        from subprocess import CompletedProcess
 
         if "gh" in cmd and "search" in cmd and "type:issue" in cmd:
             return CompletedProcess(
@@ -72,7 +72,6 @@ def test_scan_prs(scanner, db, monkeypatch):
 
     def mock_run(cmd, *args, **kwargs):
         # Check if the call is for gh search prs, 2. get branch details via gh pr view
-        from subprocess import CompletedProcess
 
         if "gh" in cmd and "search" in cmd and "type:pr" in cmd:
             return CompletedProcess(
