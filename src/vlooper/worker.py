@@ -1,8 +1,8 @@
 """Worker module to execute tasks via OpenCode."""
 
+import json
 import os
 import shlex
-import json
 
 from vlooper.config import config
 from vlooper.database import Database
@@ -173,11 +173,11 @@ class Worker:  # pylint: disable=too-few-public-methods
                     details = get_pr_details(repo_full_name, branch_name)
                     if details:
                         pr_number = details[0]
-                except Exception:
-                    pass
-        except VLooperError as e:
+                except Exception as e:
+                    print(f"⚠️ Could not retrieve PR details: {e}")
+        except VLooperError:
             self._stash_and_checkout_main(repo_dir)
-            raise e
+            raise
 
         return True, pr_number
 
