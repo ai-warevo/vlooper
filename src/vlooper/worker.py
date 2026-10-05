@@ -156,7 +156,9 @@ class Worker:  # pylint: disable=too-few-public-methods
         # 4. Run Opencode Loop
         success = self._run_opencode_loop(task, task_id, context, repo_dir)
         if not success:
-            raise VLooperError(f"Task failed after {config.max_retries} retries.")
+            raise VLooperError(
+                "Task failed after reaching maximum attempts or getting stuck."
+            )
 
         # 5 & 6. Commit, Push and Create PR (Delivery)
         pr_number = None
@@ -241,41 +243,64 @@ class Worker:  # pylint: disable=too-few-public-methods
                 raise VLooperError(err)
         return True
 
+    def _truncate_error(self, error_msg: str, lines: int = 50) -> str:
+        """Truncate the error message to keep only the last N lines."""
+        lines_list = error_msg.splitlines()
+        if len(lines_list) <= lines:
+            return error_msg
+        return "\n".join(lines_list[-lines:])
+
+    def _is_similar_error(self, err1: str, err2: str) -> bool:
+        """Check if two errors are similar (e.g., same traceback snippet)."""
+        return err1.strip() == err2.strip()
+
     def _run_opencode_loop(self, task, task_id, context, repo_dir):
         current_context = context
         success = False
+        last_error = None
+        consecutive_errors = 0
+        max_attempts = 5  # Hard limit on self-correcting iterations
 
-        for attempt in range(config.max_retries + 1):
+        for attempt in range(max_attempts):
             if attempt > 0:
-                print(f"🔄 Attempt {attempt}/{config.max_retries}...")
+                print(f"🔄 Attempt {attempt}/{max_attempts - 1}...")
                 self._post_github_comment(
                     task,
-                    f"🛠️ Attempt {attempt}/{config.max_retries} failed. Retrying...",
+                    f"🛠️ Attempt {attempt}/{max_attempts - 1} failed. Retrying...",
                 )
 
-            opencode_cmd = [
-                "opencode",
-                "run",
-                "--model",
-                config.model,
-                current_context,
-            ]
+            # 4. Timeouts: agent execution (90s)
             _, err = run_command(
-                opencode_cmd, cwd=repo_dir, timeout=config.execution_timeout
+                ["opencode", "run", "--model", config.model, current_context],
+                cwd=repo_dir,
+                timeout=90,
             )
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
+                truncated_err = self._truncate_error(err)
                 current_context += (
-                    f"\nThe previous attempt failed with the following errors:\n{err}"
+                    f"\nThe previous attempt failed with the following errors:\n{truncated_err}"
                     "\nPlease fix these issues and try again."
                 )
+
+                # 2. Anti-Stuck Protection
+                if last_error and truncated_err == last_error:
+                    consecutive_errors += 1
+                else:
+                    consecutive_errors = 0
+                    last_error = truncated_err
+
+                if consecutive_errors >= 2:
+                    print("🛑 Model seems stuck (repeated error). Breaking loop.")
+                    break
+
                 self.db.fail_task(task_id, err)
                 continue
 
-            test_cmd = shlex.split(config.test_command)
+            # 4. Timeouts: tests (30s)
             print(f"🧪 Running tests: {config.test_command}")
             _, test_err = run_command(
-                test_cmd, cwd=repo_dir, timeout=config.execution_timeout
+                shlex.split(config.test_command), cwd=repo_dir, timeout=30
             )
 
             if test_err is None:
@@ -283,10 +308,24 @@ class Worker:  # pylint: disable=too-few-public-methods
                 success = True
                 break
 
+            # 3. Log Truncation (Context Economy)
+            truncated_test_err = self._truncate_error(test_err, lines=50)
+
+            # 2. Anti-Stuck Protection
+            if last_error and truncated_test_err == last_error:
+                consecutive_errors += 1
+            else:
+                consecutive_errors = 0
+                last_error = truncated_test_err
+
+            if consecutive_errors >= 2:
+                print("🛑 Model seems stuck (repeated error). Breaking loop.")
+                break
+
             # Step C (Evaluate/Feedback) - Failure
             print(f"❌ Tests failed on attempt {attempt}.")
             current_context += (
-                f"\nThe previous attempt failed with the following errors:\n{test_err}"
+                f"\nThe previous attempt failed with the following errors:\n{truncated_test_err}"
                 "\nPlease fix these issues and try again."
             )
             self.db.fail_task(task_id, test_err)
