@@ -48,7 +48,7 @@ target-version = ["py312"]
 
 [tool.pylint.messages_control]
 disable = [
-    "broad-exception-caught",  # Убирает ругань на голый except Exception
+    "broad-exception-caught",
 ]
 
 [tool.pylint.design]

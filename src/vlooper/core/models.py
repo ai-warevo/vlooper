@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class LoopState:
-    """Контейнер для отслеживания состояния цикла Opencode."""
+    """Container for tracking the state of the Opencode loop."""
 
     ctx: str
     last_err_snip: str | None = None

@@ -6,10 +6,10 @@ import subprocess
 def build_gh_view_cmd(
     cmd_type: str, num: int, repo: str, fields: list[str]
 ) -> list[str]:
-    """Строит базовую команду для gh issue view или gh pr view."""
+    """Builds the base command for gh issue view or gh pr view."""
     return [
         "gh",
-        cmd_type,  # "issue" или "pr"
+        cmd_type,  # "issue" or "pr"
         "view",
         str(num),
         "--repo",
