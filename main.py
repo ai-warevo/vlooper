@@ -8,13 +8,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent / "src"))
 
 try:
-    from vlooper.daemon import VLooperDaemon
+    from vlooper.core.daemon import VLooperDaemon
 except ImportError:
     # Fallback if running as installed package
-    from vlooper.daemon import VLooperDaemon
+    from vlooper.core.daemon import VLooperDaemon
 
 try:
-    from vlooper.tui import VLooperTUI
+    from vlooper.ui.tui import VLooperTUI
 except ImportError:
     VLooperTUI = None
 
