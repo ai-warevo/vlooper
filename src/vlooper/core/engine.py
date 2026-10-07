@@ -34,6 +34,7 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
         """Process the next pending task from the database."""
         tasks = self.db.get_pending_tasks()
         if not tasks:
+            logger.debug("No pending tasks found in database.")
             return False
 
         # Pick the first pending task
@@ -44,14 +45,19 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
             f"🛠 Picking up task #{task_id}: {task['task_type']} in "
             f"{task['repo_full_name']} (branch: {task['branch_name']})"
         )
+        logger.debug(f"Task payload for #{task_id}: {task}")
 
         if not self.db.claim_task(task_id):
+            logger.warning(f"Failed to claim task #{task_id}. It might have been picked up by another instance.")
             return False  # Someone else claimed it
+
+        logger.debug(f"Successfully claimed task #{task_id}.")
 
         # Post 'Started' comment
         self._post_github_comment(task, "🤖 vLooper has picked up this task.")
 
         try:
+            logger.debug(f"Executing task #{task_id}...")
             success, pr_number = self._execute_task(task, task_id)
             if success:
                 self.db.complete_task(task_id)
