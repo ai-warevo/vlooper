@@ -1,0 +1,13 @@
+Act as a senior software engineer. Your task is to finalize the high-level orchestration and clean up the legacy code.
+
+DIRECTIONS:
+1. Create 'src/vlooper/core/engine.py'. This module will house the 'TaskEngine' class, which replaces the old 'Worker' class from 'worker.py'. 
+   - The 'TaskEngine' should be a high-level orchestrator that calls the 'agent.loop', 'git.manager', and 'github.interaction' modules to fulfill the task lifecycle (Pick task -> Execute Loop -> Commit/Push -> Create PR).
+
+2. Cleanup:
+   - Once 'src/vlooper/core/engine.py' is fully functional, DELETE 'src/vlooper/worker.py'.
+   - Update 'src/vlooper/daemon.py' to import 'TaskEngine' from 'vlooper.core.engine' instead of 'Worker' from 'vlooper.worker'.
+
+3. Final Check:
+   - Ensure all imports in 'main.py', 'daemon.py', and any other entry points are updated to the new module paths.
+   - RUN 'uv run pytest' to ensure total integration success.

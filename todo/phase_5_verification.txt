@@ -1,0 +1,7 @@
+Act as a QA engineer. Your final task is to verify the integrity of the refactored codebase.
+
+DIRECTIONS:
+1. Run 'uv run check'. This should execute linters (Ruff), formatters (Black/Ruff), and type checkers (Mypy). Fix any issues found.
+2. Run 'uv run pytest' with coverage enabled to ensure all logic paths are still covered by the test suite.
+3. Ensure that no unexpected files or dead imports remain in the 'src/' directory.
+4. Verify that the TUI and Daemon start correctly using the new module structure.

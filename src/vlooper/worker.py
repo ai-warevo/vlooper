@@ -1,16 +1,16 @@
 """Worker module to execute tasks via OpenCode."""
 
-import os
-import re
 import shlex
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
-from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
-from vlooper.utils import build_gh_view_cmd, run_command
+from vlooper.utils import run_command
+
+from vlooper.processing import error_handler
+from vlooper.git import manager as git_manager
+from vlooper.github import interaction
 
 
 @dataclass
@@ -41,52 +41,11 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _post_github_comment(self, task, message):
         """Helper to post a comment to the respective GitHub issue or PR."""
-        repo_full_name = task["repo_full_name"]
-        task_type = task["task_type"]
-        branch_name = task["branch_name"]
-
-        if task_type == "ISSUE":
-            try:
-                # Extracting number from branch name like 'issue-123'
-                parts = branch_name.split("-")
-                if len(parts) >= 2:
-                    num = parts[-1]
-                    comment_cmd = [
-                        "gh",
-                        "issue",
-                        "comment",
-                        str(num),
-                        "--repo",
-                        repo_full_name,
-                        "--body",
-                        message,
-                    ]
-                    _, err = run_command(comment_cmd)
-                    if err:
-                        print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
-                else:
-                    print(
-                        f"⚠️ Could not find issue number in branch name: {branch_name}"
-                    )
-            except Exception as e:  # noqa: W0718
-                print(f"⚠️ Error posting GitHub comment: {e}")
-        elif task_type == "PR":
-            # For PRs, this is handled by different logic or requires more state.
-            pass
+        interaction.post_github_comment(task, message)
 
     def _get_github_author(self, task):
         """Fetch the author of the issue/PR to mention them."""
-        repo_full_name = task["repo_full_name"]
-        if task["task_type"] == "ISSUE":
-            num = self._get_issue_number(task)
-            if num != "unknown" and num:
-                cmd = build_gh_view_cmd(
-                    "issue", num, repo_full_name, ["author", "--jq", ".author.login"]
-                )
-                stdout, err = run_command(cmd)
-                if not err and stdout:
-                    return stdout
-        return "assignee"
+        return interaction.get_github_author(task)
 
     def process_next_task(self):
         """Process the next pending task from the database."""
@@ -194,7 +153,9 @@ class Worker:  # pylint: disable=too-few-public-methods
                 elif task_type == "PR":
                     # Try to find existing PR number for a refinement task
                     try:
-                        details = get_pr_details(repo_full_name, branch_name)
+                        details = interaction.get_pr_details(
+                            repo_full_name, branch_name
+                        )
                         if details:
                             pr_number = details[0]
                     except Exception as e:
@@ -219,205 +180,31 @@ class Worker:  # pylint: disable=too-few-public-methods
         return f"refactor PR on {branch_name}"
 
     def _prepare_repo_dir(self, repo_full_name, repo_short_name):
-        base_dir = os.path.expanduser(config.workspace_base_dir)
-        os.makedirs(base_dir, exist_ok=True)
-        repo_dir = os.path.join(base_dir, repo_short_name)
-
-        if not os.path.exists(repo_dir):
-            print(f"📦 Cloning repository {repo_full_name}...")
-            _, err = run_command(
-                ["gh", "repo", "clone", repo_full_name, repo_short_name], cwd=base_dir
-            )
-            if err:
-                raise VLooperError(err)
-
-        print("🧹 Resetting to default branch...")
-        base_branch = "main"
-        for b in ["main", "master"]:
-            _, err = run_command(["git", "rev-parse", "--verify", b], cwd=repo_dir)
-            if not err:
-                base_branch = b
-                break
-
-        _, err = run_command(
-            ["git", "checkout", "-f", base_branch],
-            cwd=repo_dir,
-            timeout=config.execution_timeout,
-        )
-        if err:
-            raise VLooperError(err)
-
-        _, err = run_command(
-            ["git", "pull", "origin", base_branch],
-            cwd=repo_dir,
-            timeout=config.execution_timeout,
-        )
-        if err:
-            print(f"⚠️ Could not pull origin {base_branch}, proceeding anyway.")
-        return repo_dir
+        return git_manager.prepare_repo_dir(repo_full_name, repo_short_name)
 
     def _setup_branch(self, repo_dir, branch_name, task_type):
-        print(f"🌿 Preparing branch {branch_name}...")
-        _, err = run_command(
-            ["git", "checkout", "-B", branch_name],
-            cwd=repo_dir,
-            timeout=config.execution_timeout,
-        )
-        if err:
-            raise VLooperError(err)
-
-        if task_type == "PR":
-            print(f"📥 Pulling remote branch {branch_name}...")
-            _, err = run_command(
-                ["git", "pull", "origin", branch_name],
-                cwd=repo_dir,
-                timeout=config.execution_timeout,
-            )
-            if err:
-                raise VLooperError(err)
-        return True
+        return git_manager.setup_branch(repo_dir, branch_name, task_type)
 
     def _truncate_output(self, output: str, lines: int = 50) -> str:
-        """Truncate output to the last N lines."""
-        if not output:
-            return ""
-        output_lines = output.splitlines()
-        if len(output_lines) > lines:
-            return "\n".join(output_lines[-lines:])
-        return output
+        return error_handler.truncate_output(output, lines)
 
     def _clean_snippet(self, snippet: str) -> str:
-        """Remove noisy parts like file paths, line numbers, and IDs from snippets."""
-        # Remove absolute paths (starting with /)
-        snippet = re.sub(r"/[^ \n\t]+", "", snippet)
-        # Remove relative paths and line numbers like "path/to/file.py:123:456"
-        # or "path/to/file.py:123"
-        snippet = re.sub(r":\d+(?::\d+)*", "", snippet)
-        # Remove timestamps (e.g., 2023-10-07 12:00:00 or [12:00:00])
-        snippet = re.sub(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", "", snippet)
-        snippet = re.sub(r"\[?\d{2}:\d{2}:\d{2}\]?", "", snippet)
-        # Remove hex addresses and UUIDs
-        snippet = re.sub(r"0x[0-9a-fA-F]+", "", snippet)
-        snippet = re.sub(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            "",
-            snippet,
-            flags=re.IGNORECASE,
-        )
-        # Remove other noise patterns like "(106/100)"
-        snippet = re.sub(r"\(\d+/\d+\)", "", snippet)
-        # Remove common words that might change slightly
-        snippet = re.sub(r"on line \d+", "", snippet)
-        # Normalize whitespace
-        snippet = " ".join(snippet.split())
-        return snippet.strip()
+        return error_handler.clean_snippet(snippet)
 
     def _get_error_summary(self, err_text: str) -> str:
-        """Use an LLM to create a concise summary of the error."""
-        if not err_text or len(err_text.strip()) < 5:
-            return err_text
-
-        # Truncate input for the LLM if it's too long
-        truncated_err = self._truncate_output(err_text, lines=20)
-
-        prompt = (
-            "Summarize this error message in a single, concise sentence. "
-            "Focus on the root cause "
-            "(e.g., 'missing file', 'syntax error in X', 'type error in Y'). "
-            "Do not include paths or line numbers.\n\n"
-            f"{truncated_err}"
-        )
-
-        try:
-            model = config.model.split("/")[-1]  # e.g., 'ollama/gemma' -> 'gemma'
-            cmd = ["ollama", "run", model, prompt]
-            stdout, _err = run_command(cmd, timeout=30)
-            if stdout:
-                return stdout.strip()
-        except Exception as e:
-            print(f"⚠️ Error summarizing error: {e}")
-
-        # Fallback to cleaning the snippet if LLM fails
-        return self._clean_snippet(err_text)
+        return error_handler.get_error_summary(err_text)
 
     def _is_stuck(self, new_snip: str, last_err_snip: str | None) -> bool:
-        """Check if two error snippets are semantically similar."""
-        if last_err_snip is None:
-            return False
-
-        new_snip = self._clean_snippet(new_snip)
-        last_err_snip = self._clean_snippet(last_err_snip)
-
-        if not new_snip or not last_err_snip:
-            return False
-
-        similarity = SequenceMatcher(None, new_snip, last_err_snip).ratio()
-
-        # Case 1: Very similar - definitely stuck
-        if similarity >= 0.8:
-            return True
-
-        # Case 2: Very different - definitely not stuck (yet)
-        if similarity < 0.4:
-            return False
-
-        # Case 3: Ambiguous - use LLM for a second opinion
-        print(f"🤔 Similarity is {similarity:.2f}, using LLM to decide if stuck...")
-        llm_decision = self._ask_llm_if_stuck(new_snip, last_err_snip)
-
-        if llm_decision is not None:
-            return llm_decision
-
-        # Fallback to similarity score if LLM fails or is inconclusive
-        return similarity >= 0.6
+        return error_handler.is_stuck(new_snip, last_err_snip)
 
     def _ask_llm_if_stuck(self, new_snip: str, last_err_snip: str) -> bool | None:
-        """Asks the LLM to compare errors.
-
-        Returns True/False if sure, or None if failed.
-        """
-        if not config.model.startswith("ollama/"):
-            print("⚠️ Model is not an Ollama model. Skipping LLM check.")
-            return None
-
-        try:
-            prompt = self._build_stuck_prompt(new_snip, last_err_snip)
-            model = config.model.split("/")[-1]
-
-            cmd = ["ollama", "run", model, prompt]
-            stdout, _err = run_command(cmd, timeout=30)
-
-            if stdout:
-                return self._parse_llm_stuck_response(stdout)
-
-        except Exception as e:
-            print(f"⚠️ LLM stuck detection failed: {e}.")
-
-        return None
+        return error_handler.ask_llm_if_stuck(new_snip, last_err_snip)
 
     def _build_stuck_prompt(self, new_snip: str, last_err_snip: str) -> str:
-        """Builds a structured prompt for the LLM."""
-        return (
-            f"Are these two error messages semantically the same (mean the same thing)?\n"
-            f"Answer with only 'YES' or 'NO'.\n\n"
-            f"Error 1: {new_snip}\n"
-            f"Error 2: {last_err_snip}"
-        )
+        return error_handler.build_stuck_prompt(new_snip, last_err_snip)
 
     def _parse_llm_stuck_response(self, stdout: str) -> bool | None:
-        """Parses LLM output safely using word boundaries to avoid false
-
-        positives.
-        """
-        clean_resp = stdout.strip().upper().replace('"', "").replace("'", "")
-
-        if re.search(r"\bYES\b", clean_resp):
-            return True
-        if re.search(r"\bNO\b", clean_resp):
-            return False
-
-        print(f"❓ LLM returned ambiguous response: '{stdout.strip()}'")
-        return None
+        return error_handler.parse_llm_stuck_response(stdout)
 
     def _run_opencode_loop(self, task, task_id, ctx, repo_dir):
         """Run the agent-driven loop: Write -> Test -> Fix."""
@@ -463,6 +250,12 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
+            attempt_info = AttemptInfo(
+                task_id=task_id,
+                attempt=attempt,
+                pre_attempt_status=pre_attempt_status,
+                repo_dir=repo_dir,
+            )
             is_stuck = self._handle_attempt_failure(
                 err=test_err,
                 info=attempt_info,
@@ -505,14 +298,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         return test_err
 
     def _check_error_loop(self, summary, cleaned_snip, error_summaries):
-        """Check if the current error summary and snippet matches past failures closely."""
-        for prev_summary, prev_snip in error_summaries:
-            if (
-                SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
-                and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
-            ):
-                return True
-        return False
+        return error_handler.check_error_loop(summary, cleaned_snip, error_summaries)
 
     def _handle_attempt_failure(
         self,
@@ -555,99 +341,19 @@ class Worker:  # pylint: disable=too-few-public-methods
         return False
 
     def _commit_and_push(self, repo_dir, branch_name, commit_msg):
-        print("💾 Committing changes...")
-        commit_cmd = [
-            "git",
-            "-c",
-            f"user.name={config.git_user_name}",
-            "-c",
-            f"user.email={config.git_user_email}",
-            "commit",
-            "-am",
-            commit_msg,
-        ]
-        _, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.execution_timeout)
-        if err:
-            raise VLooperError(err)
-
-        print("📤 Pushing to origin...")
-        push_cmd = ["git", "push", "origin", branch_name]
-        _, err = run_command(push_cmd, cwd=repo_dir, timeout=config.execution_timeout)
-        if err:
-            raise VLooperError(err)
-        return True
+        return git_manager.commit_and_push(repo_dir, branch_name, commit_msg)
 
     def _create_pr(self, repo_full_name, repo_dir, branch_name):
-        print("📢 Creating Pull Request...")
-        _, err = create_pull_request(
-            repo_full_name,
-            f"Fix for {branch_name}",
-            "Automated fix by vLooper agent.",
-            cwd=repo_dir,
-            timeout=config.execution_timeout,
-        )
-        if err:
-            raise VLooperError(err)
-
-        details = get_pr_details(repo_full_name, branch_name)
-        if details:
-            return details[0]
-        return None
+        return interaction.create_pr(repo_full_name, repo_dir, branch_name)
 
     def _stash_and_checkout_main(self, repo_dir):
-        """Stash changes and checkout default branch if a push or PR creation fails."""
-        print("🧹 Stashing changes and checking out default branch...")
-        run_command(["git", "stash"], cwd=repo_dir)
-        base_branch = "main"
-        for b in ["main", "master"]:
-            _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
-            if not err:
-                base_branch = b
-                break
-
-        _, err = run_command(
-            ["git", "checkout", "-f", base_branch],
-            cwd=repo_dir,
-            timeout=config.execution_timeout,
-        )
-        if err:
-            print(f"⚠️ Failed to checkout default branch during cleanup: {err}")
+        git_manager.stash_and_checkout_main(repo_dir)
 
     def _delete_local_branch(self, repo_dir, branch_name):
-        """Delete the local git branch after work is done."""
-        print(f"🗑 Deleting local branch {branch_name}...")
-        # 1. Forcefully clean up any uncommitted changes
-        # or untracked files to allow switching branches.
-        run_command(["git", "reset", "--hard", "HEAD"], cwd=repo_dir)
-        run_command(["git", "clean", "-fd"], cwd=repo_dir)
-
-        # 2. Switch back to a default branch (main or master).
-        switched = False
-        for b in ["main", "master"]:
-            _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
-            if not err:
-                switched = True
-                break
-
-        if not switched:
-            print("⚠️ Could not checkout main/master, attempting to detach HEAD...")
-            _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
-            if not err:
-                switched = True
-
-        # 3. Delete the branch.
-        _, err = run_command(["git", "branch", "-D", branch_name], cwd=repo_dir)
-        if err:
-            print(f"ℹ️ Note: Could not delete local branch {branch_name}: {err}")
+        git_manager.delete_local_branch(repo_dir, branch_name)
 
     def _delete_remote_branch(self, repo_dir, branch_name):
-        """Attempt to delete the remote git branch."""
-        print(f"🗑 Attempting to delete remote branch {branch_name}...")
-        _, err = run_command(
-            ["git", "push", "origin", "--delete", branch_name], cwd=repo_dir
-        )
-        if err:
-            print(f"ℹ️ Note: Could not delete remote branch {branch_name}: {err}")
+        git_manager.delete_remote_branch(repo_dir, branch_name)
 
     def _get_context(self, task, repo_full_name):
         """Fetch context for the task from GitHub."""
@@ -656,48 +362,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         return self._get_pr_context(task, repo_full_name)
 
     def _get_issue_context(self, task, repo_full_name):
-        num = (
-            task["branch_name"].split("-")[-1]
-            if "-" in task["branch_name"]
-            else "unknown"
-        )
-        if num == "unknown":
-            return None
-
-        details = get_issue_details(num, repo_full_name)
-        if not details:
-            return None
-        title, body, comments_text = details
-
-        return (
-            f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
-            f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
-        )
+        return interaction.get_issue_context(task, repo_full_name)
 
     def _get_pr_context(self, task, repo_full_name):
-        try:
-            details = get_pr_details(repo_full_name, task["branch_name"])
-            if not details:
-                return None
-
-            num, _, body, review_text = details
-
-            if "Исправлено ботом" in review_text:
-                return None
-
-            return (
-                f"Доработка по Pull Request #{num} в репозитории "
-                f"{repo_full_name} (ветка {task['branch_name']}).\nЗамечания к коду:\n"
-                f"{review_text}\n\nОписание PR:\n{body}"
-            )
-        except Exception:  # noqa: W0718
-            return None
-
-    def _get_issue_number(self, task):
-        """Get issue number from task."""
-        if task["task_type"] == "ISSUE":
-            try:
-                return task["branch_name"].split("-")[-1]
-            except Exception:  # noqa: W0718
-                return "unknown"
-        return "PR"
+        return interaction.get_pr_context(task, repo_full_name)

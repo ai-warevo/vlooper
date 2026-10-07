@@ -1,0 +1,32 @@
+Act as a senior software engineer. Your task is to extract low-level, specialized logic from 'src/vlooper/worker.py' into discrete modules to satisfy the Single Responsibility Principle (SRP).
+
+FILES TO CREATE/MODIFY:
+1. Create 'src/vlooper/processing/error_handler.py'. Move all text processing and error analysis logic there, specifically:
+   - '_truncate_output'
+   - '_clean_snippet'
+   - '_get_error_summary'
+   - '_is_stuck'
+   - '_ask_llm_if_stuck'
+   - '_build_stuck_prompt'
+   - '_parse_llm_stuck_response'
+   - '_check_error_loop'
+
+2. Create 'src/vlooper/git/manager.py'. Move all local filesystem and git command logic there:
+   - '_prepare_repo_dir'
+   - '_setup_branch'
+   - '_commit_and_push'
+   - '_stash_and_checkout_main'
+   - '_delete_local_branch'
+   - '_delete_remote_branch'
+
+3. Create 'src/vlooper/github/interaction.py'. Move all GitHub interaction logic (via gh CLI) there:
+   - '_post_github_comment'
+   - '_get_github_author'
+   - '_create_pr'
+   - '_get_issue_context'
+   - '_get_pr_context'
+
+DIRECTIONS:
+- Ensure that newly created modules import 'config', 'run_command', and other necessary utilities as needed.
+- Update the imports in 'src/vlooper/worker.py' (though it will become thin soon) so they point to these new modules instead of having the logic inline.
+- RUN 'uv run pytest' after extraction to verify no regressions.
