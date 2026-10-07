@@ -6,11 +6,11 @@ import sys
 
 def run_command(command: list[str]) -> int:
     """Runs a system command and returns its return code."""
-    print(f"▶️ Running: {' '.join(command)}...")
+    print(f"[{' '.join(command)}]▶️ Running...")
     try:
         result = subprocess.run(command, check=False)
         if result.returncode == 0:
-            print("✅ Success!")
+            print(f"[{' '.join(command)}]✅ Success!")
             return 0
         print(f"❌ Error! Return code: {result.returncode}")
         return result.returncode

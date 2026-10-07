@@ -284,7 +284,8 @@ class Worker:  # pylint: disable=too-few-public-methods
                     self.db.fail_task(task_id, err)
                     break
 
-                ctx += f"\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+                ctx += "\nThe previous attempt failed with the following errors:"
+                ctx += f"\n{err}\nPlease fix these issues and try again."
                 self.db.fail_task(task_id, err)
                 continue
 
@@ -312,7 +313,8 @@ class Worker:  # pylint: disable=too-few-public-methods
                 self.db.fail_task(task_id, test_err)
                 break
 
-            ctx += f"\nThe previous attempt failed with the following errors:\n{test_err}\nPlease fix these issues and try again."
+            ctx += "\nThe previous attempt failed with the following errors:"
+            ctx += f"\n{test_err}\nPlease fix these issues and try again."
             self.db.fail_task(task_id, test_err)
 
         return success
