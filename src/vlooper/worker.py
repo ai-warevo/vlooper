@@ -22,6 +22,16 @@ class LoopState:
     consecutive_errs: int = 0
 
 
+@dataclass
+class AttemptInfo:
+    """TODO REPLACE_ME"""
+
+    task_id: str
+    attempt: int
+    pre_attempt_status: str
+    repo_dir: str
+
+
 class Worker:  # pylint: disable=too-few-public-methods
     """Worker to handle task execution and GitHub interactions."""
 
@@ -428,12 +438,15 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                is_stuck = self._handle_attempt_failure(
-                    err=err,
+                attempt_info = AttemptInfo(
                     task_id=task_id,
                     attempt=attempt,
                     pre_attempt_status=pre_attempt_status,
                     repo_dir=repo_dir,
+                )
+                is_stuck = self._handle_attempt_failure(
+                    err=err,
+                    info=attempt_info,
                     error_summaries=error_summaries,
                     state=state,
                 )
@@ -452,10 +465,7 @@ class Worker:  # pylint: disable=too-few-public-methods
             print(f"❌ Tests failed on attempt {attempt}.")
             is_stuck = self._handle_attempt_failure(
                 err=test_err,
-                task_id=task_id,
-                attempt=attempt,
-                pre_attempt_status=pre_attempt_status,
-                repo_dir=repo_dir,
+                info=attempt_info,
                 error_summaries=error_summaries,
                 state=state,
             )
@@ -507,19 +517,16 @@ class Worker:  # pylint: disable=too-few-public-methods
     def _handle_attempt_failure(
         self,
         err,
-        task_id,
-        attempt,
-        pre_attempt_status,
-        repo_dir,
+        info: AttemptInfo,
         error_summaries,
         state: LoopState,
     ):
         """Process an execution/test error, check if the agent is stuck, and update state."""
         snip = self._truncate_output(err, lines=15)
         post_attempt_status, _ = run_command(
-            ["git", "status", "--porcelain"], cwd=repo_dir
+            ["git", "status", "--porcelain"], cwd=info.repo_dir
         )
-        made_changes = post_attempt_status != pre_attempt_status
+        made_changes = post_attempt_status != info.pre_attempt_status
 
         summary = self._get_error_summary(snip)
         cleaned_snip = self._clean_snippet(snip)
@@ -531,19 +538,19 @@ class Worker:  # pylint: disable=too-few-public-methods
         is_stuck = (
             is_loop
             or self._is_stuck(snip, state.last_err_snip)
-            or (attempt > 1 and not made_changes)
+            or (info.attempt > 1 and not made_changes)
         )
         state.consecutive_errs = state.consecutive_errs + 1 if is_stuck else 1
         state.last_err_snip = snip
 
         if state.consecutive_errs >= 2:
             print("🚨 Agent stuck! Loop detected or same error twice. Breaking loop.")
-            self.db.fail_task(task_id, err)
+            self.db.fail_task(info.task_id, err)
             return True
 
         state.ctx += "\nThe previous attempt failed with the following errors:"
         state.ctx += f"\n{err}\nPlease fix these issues and try again."
-        self.db.fail_task(task_id, err)
+        self.db.fail_task(info.task_id, err)
 
         return False
 

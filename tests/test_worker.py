@@ -281,7 +281,7 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
 def test_is_stuck(worker):
     """Test the stuck detection algorithm."""
     err1 = "Error: File not found at /home/user/project/src/main.py on line 10"
-    err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"  # slightly different path
+    err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"
     err3 = "Completely different error message"
 
     # Should be considered stuck (similar)
