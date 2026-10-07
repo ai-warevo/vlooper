@@ -7,6 +7,7 @@ from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
 from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
+from vlooper.i18n import i18n
 from vlooper.utils import build_gh_view_cmd, run_command
 
 
@@ -77,26 +78,22 @@ class Worker:  # pylint: disable=too-few-public-methods
         task_id = task["id"]
 
         print(
-            f"🛠 Picking up task #{task_id}: {task['task_type']} in "
-            f"{task['repo_full_name']} (branch: {task['branch_name']})"
+            i18n.t("tui.picking_up_task", task_id=task_id, task_type=task["task_type"], repo_full_name=task["repo_full_name"], branch_name=task["branch_name"])
         )
 
         if not self.db.claim_task(task_id):
             return False  # Someone else claimed it
 
         # Post 'Started' comment
-        self._post_github_comment(task, "🤖 vLooper has picked up this task.")
+        self._post_github_comment(task, i18n.t("task_started", task_type=task["task_type"]))
 
         try:
             success, pr_number = self._execute_task(task, task_id)
             if success:
                 self.db.complete_task(task_id)
-                # Post finishing comment (for issues or PRs)
-                mention = self._get_github_author(task)
-                pr_suffix = f" #{pr_number}" if pr_number else ""
                 self._post_github_comment(
                     task,
-                    f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}",
+                    i18n.t("task_completed", mention=mention, pr_suffix=pr_suffix),
                 )
                 print(f"✅ Task #{task_id} completed successfully.")
             else:
@@ -242,7 +239,9 @@ class Worker:  # pylint: disable=too-few-public-methods
                 raise VLooperError(err)
         return True
 
-    def _truncate_output(self, output: str, lines: int = 50) -> str:
+    def _truncate_output(
+        self, output: str, lines: int = config.output_truncate_lines
+    ) -> str:
         """Truncate output to the last N lines."""
         if not output:
             return ""
@@ -257,7 +256,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         success = False
         last_err_snip = None
         consecutive_errs = 0
-        max_attempts = 5
+        max_attempts = config.max_opencode_attempts
 
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
@@ -266,20 +265,23 @@ class Worker:  # pylint: disable=too-few-public-methods
                     task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
                 )
 
-            # 1. Run Opencode (Agent execution) - Requirement 4: 90s timeout
+            # 1. Run Opencode (Agent execution)
             print("🤖 Running Opencode agent...")
             opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
             _, err = run_command(
-                opencode_cmd, cwd=repo_dir, timeout=90, truncate_lines=50
+                opencode_cmd,
+                cwd=repo_dir,
+                timeout=config.opencode_timeout,
+                truncate_lines=config.output_truncate_lines,
             )
 
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                snip = self._truncate_output(err, lines=15)
+                snip = self._truncate_output(err, lines=config.error_snippet_lines)
                 consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
                 last_err_snip = snip
 
-                if consecutive_errs >= 2:
+                if consecutive_errs >= config.consecutive_error_threshold:
                     print("🚨 Agent stuck! Same error twice. Breaking loop.")
                     self.db.fail_task(task_id, err)
                     break
@@ -288,13 +290,13 @@ class Worker:  # pylint: disable=too-few-public-methods
                 self.db.fail_task(task_id, err)
                 continue
 
-            # 2. Run Tests - Requirement 4: 30s timeout
+            # 2. Run Tests
             print(f"🧪 Running tests: {config.test_command}")
             _, test_err = run_command(
                 shlex.split(config.test_command),
                 cwd=repo_dir,
-                timeout=30,
-                truncate_lines=50,
+                timeout=config.tests_timeout,
+                truncate_lines=config.output_truncate_lines,
             )
 
             if test_err is None:
@@ -303,11 +305,11 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
-            snip = self._truncate_output(test_err, lines=15)
+            snip = self._truncate_output(test_err, lines=config.error_snippet_lines)
             consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
             last_err_snip = snip
 
-            if consecutive_errs >= 2:
+            if consecutive_errs >= config.consecutive_error_threshold:
                 print("🚨 Agent stuck! Same error twice. Breaking loop.")
                 self.db.fail_task(task_id, test_err)
                 break
@@ -387,9 +389,13 @@ class Worker:  # pylint: disable=too-few-public-methods
             return None
         title, body, comments_text = details
 
-        return (
-            f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
-            f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
+        return i18n.t(
+            "issue_context_header",
+            num=num,
+            repo_full_name=repo_full_name,
+            title=title,
+            body=body,
+            comments_text=comments_text,
         )
 
     def _get_pr_context(self, task, repo_full_name):
@@ -400,13 +406,16 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             num, _, body, review_text = details
 
-            if "Исправлено ботом" in review_text:
+            if i18n.t("vlooper_fixed_marker") in review_text:
                 return None
 
-            return (
-                f"Доработка по Pull Request #{num} в репозитории "
-                f"{repo_full_name} (ветка {task['branch_name']}).\nЗамечания к коду:\n"
-                f"{review_text}\n\nОписание PR:\n{body}"
+            return i18n.t(
+                "pr_context_header",
+                num=num,
+                repo_full_name=repo_full_name,
+                branch_name=task["branch_name"],
+                review_text=review_text,
+                body=body,
             )
         except Exception:  # noqa: W0718
             return None

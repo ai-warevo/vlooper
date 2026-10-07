@@ -5,7 +5,9 @@ from typing import ClassVar
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 
+from vlooper.config import config
 from vlooper.database import Database
+from vlooper.i18n import i18n
 
 
 class VLooperTUI(App):
@@ -41,7 +43,7 @@ class VLooperTUI(App):
     def compose(self) -> ComposeResult:
         """Compose the UI components."""
         yield Header()
-        yield Static("Initializing...", id="status-panel")
+        yield Static(i18n.t("tui_initializing"), id="status-panel")
         yield DataTable()
         yield Footer()
 
@@ -50,7 +52,7 @@ class VLooperTUI(App):
         self.table = self.query_one(DataTable)
         self.status_label = self.query_one("#status-panel", Static)
         self.table.add_columns("ID", "Type", "Repo", "Branch", "Status")
-        self.set_interval(3, self.update_data)
+        self.set_interval(config.tui_refresh_interval, self.update_data)
         self.update_data()
 
     def update_data(self) -> None:
@@ -59,11 +61,11 @@ class VLooperTUI(App):
             # Update Status Panel
             active = self.db.get_active_claimed_task()
             if active:
-                status_text = (
-                    f"🚀 WORKING ON: #{active['id']} ({active['repo_full_name']})"
+                status_text = i18n.t(
+                    "tui_status_working", id=active["id"], repo=active["repo_full_name"]
                 )
             else:
-                status_text = "💤 IDLE - Waiting for tasks..."
+                status_text = i18n.t("tui_status_idle")
 
             if self.status_label:
                 self.status_label.update(status_text)
@@ -82,7 +84,7 @@ class VLooperTUI(App):
                     )
         except Exception as e:  # noqa: W0718
             if self.status_label:
-                self.status_label.update(f"⚠️ Error loading data: {e}")
+                self.status_label.update(i18n.t("tui_error_loading", error=str(e)))
 
     async def action_quit(self) -> None:
         """Handle the quit action."""

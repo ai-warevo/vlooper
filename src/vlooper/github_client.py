@@ -3,6 +3,7 @@
 import json
 
 from vlooper.utils import run_command
+from vlooper.i18n import i18n
 
 
 def get_issue_info(num, repo_full_name, fields="title,body"):
@@ -17,7 +18,7 @@ def get_issue_info(num, repo_full_name, fields="title,body"):
         return None
 
 
-def get_issue_details(num, repo_full_name):
+def get_issue_details(num, repo_full_name, bot_username=None):
     """Fetch issue details including title, body and comments."""
     data = get_issue_info(num, repo_full_name, "title,body")
     if not data:
@@ -28,22 +29,26 @@ def get_issue_details(num, repo_full_name):
 
     comments_data = get_issue_info(num, repo_full_name, "comments")
     comments_text = ""
+    bot_has_replied = False
     if comments_data and "comments" in comments_data:
         try:
             comments_list = comments_data["comments"]
-            comments_text = "\n".join(
-                [
-                    f"Комментарий от {c['author']['login']}: {c['body']}"
-                    for c in comments_list
-                ]
-            )
+            lines = []
+            for c in comments_list:
+                author = c['author']['login']
+                body_text = c['body'] or ""
+                if bot_username and author == bot_username:
+                    bot_has_replied = True
+                msg = i18n.t("github.comment_header", author=author, body=body_text)
+                lines.append(msg)
+            comments_text = "\n".join(lines)
         except (KeyError, TypeError):
             pass
 
-    return title, body, comments_text
+    return title, body, comments_text, bot_has_replied
 
 
-def get_pr_details(repo_full_name, branch):
+def get_pr_details(repo_full_name, branch, bot_username=None):
     """Fetch PR details including reviews and comments."""
     list_pr_cmd = [
         "gh",
@@ -69,14 +74,21 @@ def get_pr_details(repo_full_name, branch):
         title = pr["title"]
         body = pr["body"] or ""
 
+        bot_has_replied = False
         review_text = ""
         for r in pr.get("reviews", []):
             if r.get("body"):
-                review_text += f"Ревью от {r['author']['login']}: {r['body']}\n"
+                author = r['author']['login']
+                if bot_username and author == bot_username:
+                    bot_has_replied = True
+                review_text += i18n.t("github.review_header", author=author, body=r['body'])
         for c in pr.get("comments", []):
-            review_text += f"Замечание от {c['author']['login']}: {c['body']}\n"
+            author = c['author']['login']
+            if bot_username and author == bot_username:
+                bot_has_replied = True
+            review_text += i18n.t("github.remark_header", author=author, body=c['body'])
 
-        return num, title, body, review_text
+        return num, title, body, review_text, bot_has_replied
     except (json.JSONDecodeError, KeyError):
         return None
 

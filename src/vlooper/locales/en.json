@@ -1,0 +1,49 @@
+{
+  "github": {
+    "comment_header": "Comment from {author}: {body}",
+    "review_header": "Review from {author}: {body}\n",
+    "remark_header": "Note from {author}: {body}\n"
+  },
+  "task": {
+    "picking_up": "🛠 Picking up task #{task_id}: {task_type} in {repo_full_name} (branch: {branch_name})",
+    "completed_success": "✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}",
+    "completed_tui": "✅ Task #{task_id} completed successfully.",
+    "failed": "❌ Task #{task_id} failed: {error_msg}",
+    "escalation": "📢 Task #{task_id} reached terminal failure. Escalating...",
+    "escalation_message": "🚨 **vLooper Escalation** 🚨\n\nI have attempted to solve this task {max_retries} times but failed.\n**Last Error:** `{last_error}`\n\nPlease take manual action. @{mention}",
+    "failed_after_attempts": "Task failed after reaching maximum attempts or getting stuck.",
+    "context_issue": "Task #{num} in repository {repo_full_name}: {title}\nDescription:\n{body}\n\nConversation history:\n{comments_text}",
+    "context_pr": "Refinement for Pull Request #{num} in repository {repo_full_name} (branch {branch_name}).\nCode notes:\n{review_text}\n\nPR Description:\n{body}"
+  },
+  "bot": {
+    "picked_up": "🤖 vLooper has picked up this task.",
+    "fixed_marker": "[vlooper-fixed]"
+  },
+  "opencode": {
+    "running": "🤖 Running Opencode agent...",
+    "error": "⚠️ Opencode error on attempt {attempt}: {err}",
+    "retry": "🔄 Attempt {attempt}/{max_attempts}...",
+    "retry_failed": "🛠️ Attempt {attempt}/{max_attempts} failed. Retrying...",
+    "stuck": "🚨 Agent stuck! Same error twice. Breaking loop.",
+    "error_feedback": "\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+  },
+  "test": {
+    "running": "🧪 Running tests: {test_command}",
+    "passed": "🎉 Tests passed on attempt {attempt}!",
+    "failed": "❌ Tests failed on attempt {attempt}.",
+    "error_feedback": "\nThe previous attempt failed with the following errors:\n{err}\nPlease fix these issues and try again."
+  },
+  "git": {
+    "cloning": "📦 Cloning repository {repo_full_name}...",
+    "resetting": "🧹 Resetting to main...",
+    "pulling_main_fail": "⚠️ Could not pull origin main, proceeding anyway.",
+    "preparing_branch": "🌿 Preparing branch {branch_name}...",
+    "pulling_branch": "📥 Pulling remote branch {branch_name}...",
+    "committing": "💾 Committing changes...",
+    "pushing": "📤 Pushing to origin...",
+    "stashing_and_checkout": "🧹 Stashing changes and checking out main..."
+  },
+  "pr": {
+    "creating": "📢 Creating Pull Request..."
+  }
+}

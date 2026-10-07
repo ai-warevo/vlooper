@@ -1,0 +1,55 @@
+{
+  "github": {
+    "comment_header": "Комментарий от {author}: {body}",
+    "review_header": "Ревью от {author}: {body}\n",
+    "remark_header": "Замечание от {author}: {body}\n"
+  },
+  "issue_context_header": "Задача #{num} в репозитории {repo_full_name}: {title}\nОписание:\n{body}\n\nИстория переписки:\n{comments_text}",
+  "pr_context_header": "Доработка по Pull Request #{num} в репозитории {repo_full_name} (ветка {branch_name}).\nЗамечания к коду:\n{review_text}\n\nОписание PR:\n{body}",
+  "task": {
+    "started": "🤖 vLooper взял задачу в работу: {task_type}"
+  },
+  "bot": {
+    "completed": "✅ Задача успешно выполнена!\n@{mention} посмотри сюда:{pr_suffix}",
+    "escalation": "🚨 **Эскалация vLooper** 🚨\n\nЯ пытался решить эту задачу {attempts} раз, но не смог.\n**Последняя ошибка:** `{last_error}`\n\nПожалуйста, примите меры вручную. @{mention}"
+  },
+  "opencode": {
+    "running": "🤖 Запуск агента Opencode...",
+    "error": "⚠️ Ошибка Opencode на попытке {attempt}: {err}",
+    "attempt": "🔄 Попытка {attempt}/{max_attempts}...",
+    "attempt_failed": "🛠️ Попытка {attempt}/{max_attempts} провалена. Повторная попытка...",
+    "stuck": "🚨 Агент заст stuck! Одна и та же ошибка дважды. Прерывание цикла.",
+    "failure_feedback": "\nПредыдущая попытка завершилась с ошибками:\n{err}\nПожалуйста, исправьте их и попробуйте снова."
+  },
+  "tests": {
+    "running": "🧪 Запуск тестов: {test_command}",
+    "passed": "🎉 Тесты пройдены на попытке {attempt}!",
+    "failed": "❌ Тесты провалены на попытке {attempt}.",
+    "stuck": "🚨 Агент заст stuck! Одна и та же ошибка дважды. Прерывание цикла."
+  },
+  "git": {
+    "committing": "💾 Фиксация изменений...",
+    "pushing": "📤 Отправка в origin...",
+    "creating_pr": "📢 Создание Pull Request...",
+    "stash_and_checkout": "🧹 Сохранение изменений (stash) и переключение на main...",
+    "checkout_fail": "⚠️ Не удалось переключиться на main при очистке: {err}"
+  },
+  "repo": {
+    "cloning": "📦 Клонирование репозитория {repo_full_name}...",
+    "resetting": "🧹 Сброс к main...",
+    "pull_main_warn": "⚠️ Не удалось стянуть origin main, продолжаем несмотря на это.",
+    "preparing_branch": "🌿 Подготовка ветки {branch_name}...",
+    "pulling_branch": "📥 Стягивание удаленной ветки {branch_name}..."
+  },
+  "tui": {
+    "initializing": "Инициализация...",
+    "working_on": "🚀 РАБОТАЮ НАД: #{id} ({repo_full_name})",
+    "idle": "💤 ПРОСТОЙ - Ожидание задач...",
+    "error_loading_data": "⚠️ Ошибка загрузки данных: {e}",
+    "columns": ["ID", "Тип", "Репо", "Ветка", "Статус"],
+    "task_completed": "✅ Задача #{task_id} успешно завершена.",
+    "task_failed": "❌ Задача #{task_id} провалена: {error_msg}",
+    "escalation": "📢 Задача #{task_id} достигла терминального отказа. Эскалация..."
+  },
+  "vlooper_fixed_marker": "Исправлено ботом"
+}

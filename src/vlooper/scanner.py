@@ -17,7 +17,8 @@ class Scanner:  # pylint: disable=too-few-public-methods
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
         if retry_failed:
-            print("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
+            cooldown_min = config.failed_task_cooldown_seconds // 60
+            print(f"🔄 Mode: Retrying stale failed tasks ({cooldown_min}m cooldown)...")
             self._retry_failed_tasks()
 
         print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
@@ -26,8 +27,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
     def _retry_failed_tasks(self):
         """Retrieve stale failed tasks from DB and reset them."""
-        # 300 seconds = 5 minutes cooldown to prevent rapid retry loops for failing tasks.
-        failed_tasks = self.db.get_failed_tasks(min_age_seconds=300)
+        # cooldown to prevent rapid retry loops for failing tasks.
+        failed_tasks = self.db.get_failed_tasks(
+            min_age_seconds=config.failed_task_cooldown_seconds
+        )
         if not failed_tasks:
             return
 
