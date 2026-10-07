@@ -270,7 +270,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         success = False
         last_err_snip = None
         consecutive_errs = 0
-        max_attempts = 5
+        max_attempts = config.max_retries + 1
 
         for attempt in range(1, max_attempts + 1):
             if attempt > 1:
