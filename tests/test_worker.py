@@ -193,3 +193,86 @@ def test_worker_deletes_branch_on_success_and_failure(
     run_test_case(should_succeed=True)
     # Test Failure Case
     run_test_case(should_succeed=False)
+
+
+def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
+    """Verify that the number of attempts follows config.max_retries."""
+    # Set max_retries to 1 (meaning 2 total attempts: 1 initial + 1 retry)
+    monkeypatch.setattr(config, "max_retries", 1)
+    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+
+    # Add a task
+    db.add_task("ISSUE", "org/repo1", "issue-123")
+
+    # Track how many times opencode is called
+    opencode_call_count = 0
+
+    def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
+        nonlocal opencode_call_count
+        cmd_str = " ".join(cmd)
+        if "gh repo clone" in cmd_str:
+            target = cmd[-1]
+            base = cwd if cwd else "."
+            target_path = os.path.join(base, target)
+            os.makedirs(target_path, exist_ok=True)
+            return "success", None
+        if any(x in cmd_str for x in ["git checkout", "git pull", "git checkout -B"]):
+            return "", None
+        if "opencode run" in cmd_str:
+            opencode_call_count += 1
+            # Always fail to force retries
+            return None, "Agent failed"
+        if any(x in cmd_str for x in ["git commit", "git push", "gh pr create"]):
+            return "", None
+        return "", None
+
+    with (
+        patch("vlooper.worker.run_command", side_effect=side_effect_run),
+        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
+        patch.object(Worker, "_get_context", return_value="test context"),
+    ):
+        success = worker.process_next_task()
+        assert success is False
+
+    # With max_retries=1, we expect 2 attempts (initial + 1 retry)
+    assert opencode_call_count == 2
+
+
+def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
+    """Verify that changing config.max_retries changes the number of attempts."""
+    # Set max_retries to 0 (meaning 1 total attempt: just the initial one)
+    monkeypatch.setattr(config, "max_retries", 0)
+    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+
+    db.add_task("ISSUE", "org/repo1", "issue-123")
+
+    opencode_call_count = 0
+
+    def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
+        nonlocal opencode_call_count
+        cmd_str = " ".join(cmd)
+        if "gh repo clone" in cmd_str:
+            target = cmd[-1]
+            base = cwd if cwd else "."
+            target_path = os.path.join(base, target)
+            os.makedirs(target_path, exist_ok=True)
+            return "success", None
+        if any(x in cmd_str for x in ["git checkout", "git pull", "git checkout -B"]):
+            return "", None
+        if "opencode run" in cmd_str:
+            opencode_call_count += 1
+            return None, "Agent failed"
+        if any(x in cmd_str for x in ["git commit", "git push", "gh pr create"]):
+            return "", None
+        return "", None
+
+    with (
+        patch("vlooper.worker.run_command", side_effect=side_effect_run),
+        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
+        patch.object(Worker, "_get_context", return_value="test context"),
+    ):
+        success = worker.process_next_task()
+        assert success is False
+
+    # With max_retries=0, we expect 1 attempt
+    assert opencode_call_count == 1
