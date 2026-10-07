@@ -37,13 +37,15 @@ def post_github_comment(task, message):
                 ]
                 _, err = run_command(comment_cmd)
                 if err:
-                    logger.warning(f"Failed to post GitHub comment for #{num}: {err}")
+                    logger.warning(
+                        "Failed to post GitHub comment for #%s: %s", num, err
+                    )
             else:
                 logger.warning(
-                    f"Could not find issue number in branch name: {branch_name}"
+                    "Could not find issue number in branch name: %s", branch_name
                 )
         except Exception as e:  # noqa: W0718
-            logger.error(f"Error posting GitHub comment: {e}")
+            logger.error("Error posting GitHub comment: %s", e)
     elif task_type == "PR":
         logger.debug("TODO: pr comment logic ...")
         # For PRs, this is handled by different logic or requires more state.

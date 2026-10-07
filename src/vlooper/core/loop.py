@@ -25,29 +25,32 @@ class AILoop:
         state = LoopState(ctx=ctx)
 
         logger.debug(
-            f"Starting Opencode loop for task #{task_id}. Max attempts: {max_attempts}"
+            "Starting Opencode loop for task #%s. Max attempts: %s",
+            task_id,
+            max_attempts,
         )
 
         for attempt in range(1, max_attempts + 1):
             logger.debug(
-                f"Starting attempt {attempt}/{max_attempts} for task #{task_id}."
+                "Starting attempt %s/%s for task #%s.", attempt, max_attempts, task_id
             )
             pre_attempt_status, _ = run_command(
                 ["git", "status", "--porcelain"], cwd=repo_dir
             )
             logger.debug(
-                f"Pre-attempt git status: {pre_attempt_status if pre_attempt_status else 'Clean'}"
+                "Pre-attempt git status: %s",
+                pre_attempt_status if pre_attempt_status else "Clean",
             )
 
             if attempt > 1:
                 self._notify_retry_attempt(task, attempt, max_attempts)
 
             # 1. Run Opencode (Agent execution)
-            logger.debug(f"[Attempt {attempt}] Running agent tool execution...")
+            logger.debug("[Attempt %s] Running agent tool execution...", attempt)
             err = self._execute_opencode_agent(state.ctx, repo_dir)
 
             if err:
-                logger.warning(f"⚠️ Opencode error on attempt {attempt}: {err}")
+                logger.warning("⚠️ Opencode error on attempt %s: %s", attempt, err)
                 attempt_info = AttemptInfo(
                     task_id=task_id,
                     attempt=attempt,
@@ -67,16 +70,16 @@ class AILoop:
 
             # 2. Run Tests
             logger.debug(
-                f"[Attempt {attempt}] Agent execution successful. Starting tests..."
+                "[Attempt %s] Agent execution successful. Starting tests...", attempt
             )
             test_err = self._execute_tests(repo_dir)
 
             if test_err is None:
-                logger.info(f"🎉 Tests passed on attempt {attempt}!")
+                logger.info("🎉 Tests passed on attempt %s!", attempt)
                 return True
 
             # Step C (Evaluate/Feedback) - Failure logic
-            logger.error(f"❌ Tests failed on attempt {attempt}.")
+            logger.error("❌ Tests failed on attempt %s.", attempt)
             attempt_info = AttemptInfo(
                 task_id=task_id,
                 attempt=attempt,
@@ -99,7 +102,7 @@ class AILoop:
 
     def _notify_retry_attempt(self, task, attempt, max_attempts):
         """Print and post a comment about the retry status."""
-        logger.info(f"🔄 Attempt {attempt}/{max_attempts}...")
+        logger.info("🔄 Attempt %s/%s...", attempt, max_attempts)
         self._post_github_comment(
             task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
         )
@@ -108,7 +111,7 @@ class AILoop:
         """Run the Opencode agent command and return any stderr/error content."""
         logger.info("🤖 Running Opencode agent...")
         opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
-        logger.debug(f"Executing Agent Command: {' '.join(opencode_cmd)}")
+        logger.debug("Executing Agent Command: %s", " ".join(opencode_cmd))
         _, err = run_command(
             opencode_cmd,
             cwd=repo_dir,
@@ -119,8 +122,8 @@ class AILoop:
 
     def _execute_tests(self, repo_dir):
         """Run the configured test suite command and return any stderr/error content."""
-        logger.info(f"🧪 Running tests: {config.test_command}")
-        logger.debug(f"Executing Test Command: {config.test_command} in {repo_dir}")
+        logger.info("🧪 Running tests: %s", config.test_command)
+        logger.debug("Executing Test Command: %s in %s", config.test_command, repo_dir)
         _, test_err = run_command(
             shlex.split(config.test_command),
             cwd=repo_dir,
@@ -138,19 +141,19 @@ class AILoop:
     ):
         """Process an execution/test error, check if the agent is stuck, and update state."""
         snip = error_handler.truncate_output(err, lines=15)
-        logger.debug(f"Error snippet for failure analysis: {snip}")
+        logger.debug("Error snippet for failure analysis: %s", snip)
 
         post_attempt_status, _ = run_command(
             ["git", "status", "--porcelain"], cwd=info.repo_dir
         )
         made_changes = post_attempt_status != info.pre_attempt_status
-        logger.debug(f"Changes detected after failure: {made_changes}")
+        logger.debug("Changes detected after failure: %s", made_changes)
 
         summary = error_handler.get_error_summary(snip)
         cleaned_snip = error_handler.clean_snippet(snip)
 
         is_loop = error_handler.check_error_loop(summary, cleaned_snip, error_summaries)
-        logger.debug(f"Error loop detection: {is_loop}")
+        logger.debug("Error loop detection: %s", is_loop)
 
         if not is_loop:
             error_summaries.append((summary, cleaned_snip))
@@ -160,11 +163,11 @@ class AILoop:
             or error_handler.is_stuck(snip, state.last_err_snip)
             or (info.attempt > 1 and not made_changes)
         )
-        logger.debug(f"Is agent stuck? {is_stuck}")
+        logger.debug("Is agent stuck? %s", is_stuck)
 
         state.consecutive_errs = state.consecutive_errs + 1 if is_stuck else 1
         state.last_err_snip = snip
-        logger.debug(f"Consecutive errors count: {state.consecutive_errs}")
+        logger.debug("Consecutive errors count: %s", state.consecutive_errs)
 
         if state.consecutive_errs >= 2:
             logger.error(

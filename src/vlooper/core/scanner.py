@@ -23,7 +23,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.info("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
 
-        logger.info(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
+        logger.info("🔍 Scanning for new tasks in organization: %s...", config.org_name)
         self._scan_issues()
         self._scan_prs()
 
@@ -38,12 +38,12 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         logger.info(
-            f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them..."
+            "♻️ Found %s stale failed tasks. Resetting them...", len(failed_tasks)
         )
         for task in failed_tasks:
-            logger.debug(f"Resetting task #{task['id']} to PENDING.")
+            logger.debug("Resetting task #%s to PENDING.", task["id"])
             self.db.reset_task_status(task["id"])
-            logger.info(f"   ✅ Task #{task['id']} reset to PENDING.")
+            logger.info("   ✅ Task #%s reset to PENDING.", task["id"])
 
     def _scan_issues(self):
         """Scan for open issues assigned to the bot."""
@@ -58,10 +58,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
             "--json",
             "number,title,body,repository,isPullRequest",
         ]
-        logger.debug(f"Running issue search command: {' '.join(search_issues_cmd)}")
+        logger.debug("Running issue search command: %s", " ".join(search_issues_cmd))
         issues_json, err = run_command(search_issues_cmd)
         if err or not issues_json:
-            logger.debug(f"Issue search failed or returned no data. Error: {err}")
+            logger.debug("Issue search failed or returned no data. Error: %s", err)
             return
 
         try:
@@ -71,7 +71,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         logger.debug(
-            f"Parsed {len(issues)} potential issue/PR items from GitHub search."
+            "Parsed %s potential issue/PR items from GitHub search.", len(issues)
         )
 
         for issue in issues:
@@ -83,7 +83,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
             # For issues, we might want a representative branch name or just use 'issue-{num}'
             branch_name = f"issue-{num}"
             logger.debug(
-                f"Adding task for issue #{num}: {repo_full_name} (branch: {branch_name})"
+                "Adding task for issue #%s: %s (branch: %s)",
+                num,
+                repo_full_name,
+                branch_name,
             )
             self.db.add_task("ISSUE", repo_full_name, branch_name)
 
@@ -100,10 +103,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
             "--json",
             "number,title,body,repository,isPullRequest",
         ]
-        logger.debug(f"Running PR search command: {' '.join(search_prs_cmd)}")
+        logger.debug("Running PR search command: %s", " ".join(search_prs_cmd))
         prs_json, err = run_command(search_prs_cmd)
         if err or not prs_json:
-            logger.debug(f"PR search failed or returned no data. Error: {err}")
+            logger.debug("PR search failed or returned no data. Error: %s", err)
             return
 
         try:
@@ -112,7 +115,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.error("Failed to parse PRs JSON.")
             return
 
-        logger.debug(f"Parsed {len(prs)} potential issue/PR items from GitHub search.")
+        logger.debug("Parsed %s potential issue/PR items from GitHub search.", len(prs))
 
         for pr in prs:
             if not pr.get("isPullRequest"):
@@ -122,13 +125,13 @@ class Scanner:  # pylint: disable=too-few-public-methods
             repo_full_name = pr["repository"]["nameWithOwner"]
 
             # Get the branch name for the PR
-            logger.debug(f"Fetching details for PR #{num} to get head branch...")
+            logger.debug("Fetching details for PR #%s to get head branch...", num)
             pr_details_cmd = build_gh_view_cmd(
                 "pr", num, repo_full_name, ["headRefName"]
             )
             pr_details_json, err = run_command(pr_details_cmd)
             if err or not pr_details_json:
-                logger.debug(f"Could not fetch details for PR #{num}. Skipping.")
+                logger.debug("Could not fetch details for PR #%s. Skipping.", num)
                 continue
 
             try:
@@ -136,8 +139,11 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 branch = pr_data.get("headRefName")
                 if branch:
                     logger.debug(
-                        f"Adding task for PR #{num}: {repo_full_name} (branch: {branch})"
+                        "Adding task for PR #%s: %s (branch: %s)",
+                        num,
+                        repo_full_name,
+                        branch,
                     )
                     self.db.add_task("PR", repo_full_name, branch)
             except (json.JSONDecodeError, KeyError):
-                logger.error(f"Failed to parse PR details for #{num}")
+                logger.error("Failed to parse PR details for #%s", num)

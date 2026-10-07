@@ -70,7 +70,7 @@ def get_error_summary(err_text: str) -> str:
         if stdout:
             return stdout.strip()
     except Exception as e:
-        logger.warning(f"Error summarizing error: {e}")
+        logger.warning("Error summarizing error: %s", e)
 
     # Fallback to cleaning the snippet if LLM fails
     return clean_snippet(err_text)
@@ -98,7 +98,7 @@ def is_stuck(new_snip: str, last_err_snip: str | None) -> bool:
         return False
 
     # Case 3: Ambiguous - use LLM for a second opinion
-    logger.info(f"Similarity is {similarity:.2f}, using LLM to decide if stuck...")
+    logger.info("Similarity is %.2f, using LLM to decide if stuck...", similarity)
     llm_decision = ask_llm_if_stuck(new_snip, last_err_snip)
 
     if llm_decision is not None:
@@ -128,7 +128,7 @@ def ask_llm_if_stuck(new_snip: str, last_err_snip: str) -> bool | None:
             return parse_llm_stuck_response(stdout)
 
     except Exception as e:
-        logger.warning(f"LLM stuck detection failed: {e}.")
+        logger.warning("LLM stuck detection failed: %s.", e)
 
     return None
 
@@ -155,7 +155,7 @@ def parse_llm_stuck_response(stdout: str) -> bool | None:
     if re.search(r"\bNO\b", clean_resp):
         return False
 
-    logger.warning(f"LLM returned ambiguous response: '{stdout.strip()}'")
+    logger.warning("LLM returned ambiguous response: '%s'", stdout.strip())
     return None
 
 
