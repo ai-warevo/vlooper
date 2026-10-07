@@ -1,5 +1,6 @@
 import logging
 import sys
+
 from vlooper.config import config
 
 

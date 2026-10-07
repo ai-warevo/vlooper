@@ -1,7 +1,5 @@
 """TaskEngine module to orchestrate task execution."""
 
-import logging
-
 from vlooper.config import config
 from vlooper.core import error_handler
 from vlooper.core.exceptions import VLooperError
@@ -48,7 +46,9 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
         logger.debug(f"Task payload for #{task_id}: {task}")
 
         if not self.db.claim_task(task_id):
-            logger.warning(f"Failed to claim task #{task_id}. It might have been picked up by another instance.")
+            logger.warning(
+                f"Failed to claim task #{task_id}. It might have been picked up by another instance."
+            )
             return False  # Someone else claimed it
 
         logger.debug(f"Successfully claimed task #{task_id}.")

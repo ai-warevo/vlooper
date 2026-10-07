@@ -1,7 +1,6 @@
 """Utility functions for vLooper."""
 
 import subprocess
-import logging
 
 from vlooper.logger import get_logger
 

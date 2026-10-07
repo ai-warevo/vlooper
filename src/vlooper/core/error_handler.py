@@ -1,12 +1,11 @@
 """Module for handling and summarizing errors encountered during execution."""
 
 import re
-import logging
 from difflib import SequenceMatcher
 
 from vlooper.config import config
-from vlooper.utils import run_command
 from vlooper.logger import get_logger
+from vlooper.utils import run_command
 
 logger = get_logger(__name__)
 

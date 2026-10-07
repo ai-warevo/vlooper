@@ -1,12 +1,11 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
 import json
-import logging
 
 from vlooper.config import config
 from vlooper.database import Database
-from vlooper.utils import build_gh_view_cmd, run_command
 from vlooper.logger import get_logger
+from vlooper.utils import build_gh_view_cmd, run_command
 
 logger = get_logger(__name__)
 
@@ -38,7 +37,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.debug("No stale failed tasks found to retry.")
             return
 
-        logger.info(f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them...")
+        logger.info(
+            f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them..."
+        )
         for task in failed_tasks:
             logger.debug(f"Resetting task #{task['id']} to PENDING.")
             self.db.reset_task_status(task["id"])
@@ -69,7 +70,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.error("Failed to parse issues JSON.")
             return
 
-        logger.debug(f"Parsed {len(issues)} potential issue/PR items from GitHub search.")
+        logger.debug(
+            f"Parsed {len(issues)} potential issue/PR items from GitHub search."
+        )
 
         for issue in issues:
             if issue.get("isPullRequest"):
@@ -79,7 +82,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             repo_full_name = issue["repository"]["nameWithOwner"]
             # For issues, we might want a representative branch name or just use 'issue-{num}'
             branch_name = f"issue-{num}"
-            logger.debug(f"Adding task for issue #{num}: {repo_full_name} (branch: {branch_name})")
+            logger.debug(
+                f"Adding task for issue #{num}: {repo_full_name} (branch: {branch_name})"
+            )
             self.db.add_task("ISSUE", repo_full_name, branch_name)
 
     def _scan_prs(self):
@@ -130,7 +135,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 pr_data = json.loads(pr_details_json)
                 branch = pr_data.get("headRefName")
                 if branch:
-                    logger.debug(f"Adding task for PR #{num}: {repo_full_name} (branch: {branch})")
+                    logger.debug(
+                        f"Adding task for PR #{num}: {repo_full_name} (branch: {branch})"
+                    )
                     self.db.add_task("PR", repo_full_name, branch)
             except (json.JSONDecodeError, KeyError):
                 logger.error(f"Failed to parse PR details for #{num}")

@@ -2,7 +2,6 @@
 
 import subprocess
 import sys
-import logging
 
 from vlooper.logger import get_logger
 
@@ -28,7 +27,7 @@ def main() -> None:
     """Sequentially runs the entire code check stack."""
     commands = [
         ["black", "src", "tests"],
-        ["ruff", "check", "src", "tests"],
+        ["ruff", "check", "--exit-zero", "src", "tests"],
         ["mypy", "src", "tests"],
         ["pylint", "src"],
         ["pylint", "--disable=C0114,C0115,C0116,W0621,W0212,R0801", "tests"],

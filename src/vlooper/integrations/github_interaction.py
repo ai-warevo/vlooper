@@ -1,7 +1,5 @@
 """Module for interacting with GitHub via CLI (gh)."""
 
-import logging
-
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.integrations.github_client import (
@@ -9,8 +7,8 @@ from vlooper.integrations.github_client import (
     get_issue_details,
     get_pr_details,
 )
-from vlooper.utils import build_gh_view_cmd, run_command
 from vlooper.logger import get_logger
+from vlooper.utils import build_gh_view_cmd, run_command
 
 logger = get_logger(__name__)
 
