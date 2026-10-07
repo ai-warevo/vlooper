@@ -74,13 +74,14 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
         return "", None
 
     patches = get_all_run_command_patches(side_effect_run)
-    with patch.object(Worker, "_get_context", return_value="test context"):
-
-        with contextlib.ExitStack() as stack:
-            for p in patches:
-                stack.enter_context(p)
-            success = worker.process_next_task()
-            assert success is True
+    with (
+        patch.object(Worker, "_get_context", return_value="test context"),
+        contextlib.ExitStack() as stack,
+    ):
+        for p in patches:
+            stack.enter_context(p)
+        success = worker.process_next_task()
+        assert success is True
 
     # Verify DB status
     with db._get_connection() as conn:
@@ -107,13 +108,15 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
         return "", None
 
     patches = get_all_run_command_patches(side_effect_run)
-    with patch.object(Worker, "_get_context", return_value="test context"):
-        with contextlib.ExitStack() as stack:
-            for p in patches:
-                stack.enter_context(p)
-            # The task will fail after all retries
-            success = worker.process_next_task()
-            assert success is False
+    with (
+        patch.object(Worker, "_get_context", return_value="test context"),
+        contextlib.ExitStack() as stack,
+    ):
+        for p in patches:
+            stack.enter_context(p)
+        # The task will fail after all retries
+        success = worker.process_next_task()
+        assert success is False
 
     # Verify DB status is FAILED
     with db._get_connection() as conn:
@@ -147,7 +150,6 @@ def test_get_context_issue(worker, db, monkeypatch):
         return "", None
 
     patches = get_all_run_command_patches(mock_run)
-    import contextlib
 
     with contextlib.ExitStack() as stack:
         for p in patches:
@@ -199,13 +201,13 @@ def test_worker_deletes_branch_on_success_and_failure(
             return "", None
 
         patches = get_all_run_command_patches(side_effect_run)
-        with patch.object(Worker, "_get_context", return_value="test context"):
-            import contextlib
-
-            with contextlib.ExitStack() as stack:
-                for p in patches:
-                    stack.enter_context(p)
-                worker.process_next_task()
+        with (
+            patch.object(Worker, "_get_context", return_value="test context"),
+            contextlib.ExitStack() as stack,
+        ):
+            for p in patches:
+                stack.enter_context(p)
+            worker.process_next_task()
 
         # Check if git branch -D was called for this branch
         delete_cmd = f"git branch -D {branch_name}"
@@ -249,14 +251,14 @@ def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
         return "", None
 
     patches = get_all_run_command_patches(side_effect_run)
-    with patch.object(Worker, "_get_context", return_value="test context"):
-        import contextlib
-
-        with contextlib.ExitStack() as stack:
-            for p in patches:
-                stack.enter_context(p)
-            success = worker.process_next_task()
-            assert success is False
+    with (
+        patch.object(Worker, "_get_context", return_value="test context"),
+        contextlib.ExitStack() as stack,
+    ):
+        for p in patches:
+            stack.enter_context(p)
+        success = worker.process_next_task()
+        assert success is False
 
     # With max_retries=1, we expect 2 attempts (initial + 1 retry)
     assert opencode_call_count == 2
@@ -291,13 +293,14 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
         return "", None
 
     patches = get_all_run_command_patches(side_effect_run)
-    with patch.object(Worker, "_get_context", return_value="test context"):
-
-        with contextlib.ExitStack() as stack:
-            for p in patches:
-                stack.enter_context(p)
-            success = worker.process_next_task()
-            assert success is False
+    with (
+        patch.object(Worker, "_get_context", return_value="test context"),
+        contextlib.ExitStack() as stack,
+    ):
+        for p in patches:
+            stack.enter_context(p)
+        success = worker.process_next_task()
+        assert success is False
 
     # With max_retries=0, we expect 1 attempt
     assert opencode_call_count == 1
