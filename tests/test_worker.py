@@ -31,7 +31,6 @@ def get_all_run_command_patches(side_effect_run):
     """Helper to provide all necessary run_command patches."""
     return [
         patch("vlooper.utils.run_command", side_effect=side_effect_run),
-        patch("vlooper.worker.run_command", side_effect=side_effect_run),
         patch("vlooper.agent.loop.run_command", side_effect=side_effect_run),
         patch("vlooper.git.manager.run_command", side_effect=side_effect_run),
         patch("vlooper.github_client.run_command", side_effect=side_effect_run),
