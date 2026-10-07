@@ -267,7 +267,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         return output
 
     def _clean_snippet(self, snippet: str) -> str:
-        """Remove noisy parts like file paths and line numbers from snippets."""
+        """Remove noisy parts like file paths, line numbers, and IDs from snippets."""
         # Remove absolute paths (starting with /)
         snippet = re.sub(r"/[^ \n\t]+", "", snippet)
         # Remove relative paths and line numbers like "path/to/file.py:123:456"
@@ -276,6 +276,14 @@ class Worker:  # pylint: disable=too-few-public-methods
         # Remove timestamps (e.g., 2023-10-07 12:00:00 or [12:00:00])
         snippet = re.sub(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", "", snippet)
         snippet = re.sub(r"\[?\d{2}:\d{2}:\d{2}\]?", "", snippet)
+        # Remove hex addresses and UUIDs
+        snippet = re.sub(r"0x[0-9a-fA-F]+", "", snippet)
+        snippet = re.sub(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "",
+            snippet,
+            flags=re.IGNORECASE,
+        )
         # Remove other noise patterns like "(106/100)"
         snippet = re.sub(r"\(\d+/\d+\)", "", snippet)
         # Remove common words that might change slightly
@@ -335,31 +343,61 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         # Case 3: Ambiguous - use LLM for a second opinion
         print(f"🤔 Similarity is {similarity:.2f}, using LLM to decide if stuck...")
+        llm_decision = self._ask_llm_if_stuck(new_snip, last_err_snip)
+
+        if llm_decision is not None:
+            return llm_decision
+
+        # Fallback to similarity score if LLM fails or is inconclusive
+        return similarity >= 0.6
+
+    def _ask_llm_if_stuck(self, new_snip: str, last_err_snip: str) -> bool | None:
+        """Asks the LLM to compare errors.
+
+        Returns True/False if sure, or None if failed.
+        """
+        if not config.model.startswith("ollama/"):
+            print("⚠️ Model is not an Ollama model. Skipping LLM check.")
+            return None
+
         try:
-            prompt = (
-                f"Are these two error messages semantically the same? "
-                f"Answer with only 'YES' or 'NO'.\n\n"
-                f"Error 1: {new_snip}\n"
-                f"Error 2: {last_err_snip}"
-            )
-            # Using ollama directly via shell for simplicity and since we know it exists.
-            model = config.model.split("/")[-1]  # e.g., 'ollama/gemma' -> 'gemma'
+            prompt = self._build_stuck_prompt(new_snip, last_err_snip)
+            model = config.model.split("/")[-1]
+
             cmd = ["ollama", "run", model, prompt]
             stdout, _err = run_command(cmd, timeout=30)
 
             if stdout:
-                response = stdout.strip().upper()
-                if "YES" in response:
-                    return True
-                if "NO" in response:
-                    return False
-        except Exception as e:
-            print(
-                f"⚠️ LLM stuck detection failed: {e}. Falling back to similarity score."
-            )
+                return self._parse_llm_stuck_response(stdout)
 
-        # Fallback to similarity score if LLM fails or is inconclusive
-        return similarity >= 0.6
+        except Exception as e:
+            print(f"⚠️ LLM stuck detection failed: {e}.")
+
+        return None
+
+    def _build_stuck_prompt(self, new_snip: str, last_err_snip: str) -> str:
+        """Builds a structured prompt for the LLM."""
+        return (
+            f"Are these two error messages semantically the same (mean the same thing)?\n"
+            f"Answer with only 'YES' or 'NO'.\n\n"
+            f"Error 1: {new_snip}\n"
+            f"Error 2: {last_err_snip}"
+        )
+
+    def _parse_llm_stuck_response(self, stdout: str) -> bool | None:
+        """Parses LLM output safely using word boundaries to avoid false
+
+        positives.
+        """
+        clean_resp = stdout.strip().upper().replace('"', "").replace("'", "")
+
+        if re.search(r"\bYES\b", clean_resp):
+            return True
+        if re.search(r"\bNO\b", clean_resp):
+            return False
+
+        print(f"❓ LLM returned ambiguous response: '{stdout.strip()}'")
+        return None
 
     def _run_opencode_loop(self, task, task_id, ctx, repo_dir):
         """Run the agent-driven loop: Write -> Test -> Fix."""
@@ -400,12 +438,18 @@ class Worker:  # pylint: disable=too-few-public-methods
                 made_changes = post_attempt_status != pre_attempt_status
 
                 summary = self._get_error_summary(snip)
-                is_loop = any(
-                    SequenceMatcher(None, summary, s).ratio() > 0.8
-                    for s in error_summaries
-                )
+                cleaned_snip = self._clean_snippet(snip)
+                is_loop = False
+                for prev_summary, prev_snip in error_summaries:
+                    if (
+                        SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
+                        and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
+                    ):
+                        is_loop = True
+                        break
+
                 if not is_loop:
-                    error_summaries.append(summary)
+                    error_summaries.append((summary, cleaned_snip))
 
                 is_stuck = (
                     is_loop
@@ -449,11 +493,18 @@ class Worker:  # pylint: disable=too-few-public-methods
             made_changes = post_attempt_status != pre_attempt_status
 
             summary = self._get_error_summary(snip)
-            is_loop = any(
-                SequenceMatcher(None, summary, s).ratio() > 0.8 for s in error_summaries
-            )
+            cleaned_snip = self._clean_snippet(snip)
+            is_loop = False
+            for prev_summary, prev_snip in error_summaries:
+                if (
+                    SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
+                    and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
+                ):
+                    is_loop = True
+                    break
+
             if not is_loop:
-                error_summaries.append(summary)
+                error_summaries.append((summary, cleaned_snip))
 
             is_stuck = (
                 is_loop
