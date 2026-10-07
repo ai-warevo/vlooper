@@ -10,7 +10,7 @@ import pytest
 
 from vlooper.config import config
 from vlooper.database import Database
-from vlooper.processing import error_handler
+from vlooper.core import error_handler
 from vlooper.core.engine import TaskEngine
 
 
@@ -31,15 +31,19 @@ def get_all_run_command_patches(side_effect_run):
     """Helper to provide all necessary run_command patches."""
     return [
         patch("vlooper.utils.run_command", side_effect=side_effect_run),
-        patch("vlooper.agent.loop.run_command", side_effect=side_effect_run),
-        patch("vlooper.git.manager.run_command", side_effect=side_effect_run),
-        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
+        patch("vlooper.core.loop.run_command", side_effect=side_effect_run),
         patch(
-            "vlooper.github.interaction.run_command", side_effect=side_effect_run
-        ),  # Just in case
-        patch(
-            "vlooper.processing.error_handler.run_command", side_effect=side_effect_run
+            "vlooper.integrations.git_manager.run_command", side_effect=side_effect_run
         ),
+        patch(
+            "vlooper.integrations.github_client.run_command",
+            side_effect=side_effect_run,
+        ),
+        patch(
+            "vlooper.integrations.github_interaction.run_command",
+            side_effect=side_effect_run,
+        ),
+        patch("vlooper.core.error_handler.run_command", side_effect=side_effect_run),
     ]
 
 

@@ -1,12 +1,12 @@
 """TaskEngine module to orchestrate task execution."""
 
-from vlooper.core.loop import AILoop
 from vlooper.config import config
-from vlooper.database import Database
+from vlooper.core import error_handler
 from vlooper.core.exceptions import VLooperError
+from vlooper.core.loop import AILoop
+from vlooper.database import Database
 from vlooper.integrations import git_manager
 from vlooper.integrations import github_interaction as interaction
-from vlooper.core import error_handler
 
 
 class TaskEngine:  # pylint: disable=too-few-public-methods

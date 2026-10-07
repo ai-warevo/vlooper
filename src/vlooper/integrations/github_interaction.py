@@ -2,7 +2,11 @@
 
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.integrations.github_client import create_pull_request, get_issue_details, get_pr_details
+from vlooper.integrations.github_client import (
+    create_pull_request,
+    get_issue_details,
+    get_pr_details,
+)
 from vlooper.utils import build_gh_view_cmd, run_command
 
 
@@ -38,7 +42,6 @@ def post_github_comment(task, message):
     elif task_type == "PR":
         print("TODO: pr comment logic ...")
         # For PRs, this is handled by different logic or requires more state.
-        pass
 
 
 def get_github_author(task):

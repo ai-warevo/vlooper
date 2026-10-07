@@ -4,7 +4,7 @@
 import importlib
 import os
 
-from vlooper import config as config_module
+config_module = importlib.import_module("vlooper.config")
 
 
 def test_config_defaults(monkeypatch):

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from vlooper.database import Database
-from vlooper.scanner import Scanner
+from vlooper.core.scanner import Scanner
 
 
 @pytest.fixture
