@@ -270,7 +270,8 @@ class Worker:  # pylint: disable=too-few-public-methods
         """Remove noisy parts like file paths and line numbers from snippets."""
         # Remove absolute paths (starting with /)
         snippet = re.sub(r"/[^ \n\t]+", "", snippet)
-        # Remove relative paths and line numbers like "path/to/file.py:123:456" or "path/to/file.py:123"
+        # Remove relative paths and line numbers like "path/to/file.py:123:456"
+        # or "path/to/file.py:123"
         snippet = re.sub(r":\d+(?::\d+)*", "", snippet)
         # Remove timestamps (e.g., 2023-10-07 12:00:00 or [12:00:00])
         snippet = re.sub(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", "", snippet)
@@ -293,7 +294,8 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         prompt = (
             "Summarize this error message in a single, concise sentence. "
-            "Focus on the root cause (e.g., 'missing file', 'syntax error in X', 'type error in Y'). "
+            "Focus on the root cause "
+            "(e.g., 'missing file', 'syntax error in X', 'type error in Y'). "
             "Do not include paths or line numbers.\n\n"
             f"{truncated_err}"
         )
@@ -349,7 +351,7 @@ class Worker:  # pylint: disable=too-few-public-methods
                 response = stdout.strip().upper()
                 if "YES" in response:
                     return True
-                elif "NO" in response:
+                if "NO" in response:
                     return False
         except Exception as e:
             print(
