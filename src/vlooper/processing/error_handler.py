@@ -1,3 +1,5 @@
+"""Module for handling and summarizing errors encountered during execution."""
+
 import re
 from difflib import SequenceMatcher
 from vlooper.config import config

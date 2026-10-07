@@ -1,3 +1,5 @@
+"""Module for managing git operations like repo cloning, branch setup, and committing."""
+
 import os
 from vlooper.config import config
 from vlooper.utils import run_command
@@ -5,6 +7,7 @@ from vlooper.exceptions import VLooperError
 
 
 def prepare_repo_dir(repo_full_name, repo_short_name):
+    """Prepare the repo directory by cloning and resetting to default branch."""
     base_dir = os.path.expanduser(config.workspace_base_dir)
     os.makedirs(base_dir, exist_ok=True)
     repo_dir = os.path.join(base_dir, repo_short_name)
@@ -44,6 +47,7 @@ def prepare_repo_dir(repo_full_name, repo_short_name):
 
 
 def setup_branch(repo_dir, branch_name, task_type):
+    """Sets up a new git branch for the given task type."""
     print(f"🌿 Preparing branch {branch_name}...")
     _, err = run_command(
         ["git", "checkout", "-B", branch_name],
@@ -66,6 +70,7 @@ def setup_branch(repo_dir, branch_name, task_type):
 
 
 def commit_and_push(repo_dir, branch_name, commit_msg):
+    """Commits changes and pushes the branch to origin."""
     print("💾 Committing changes...")
     commit_cmd = [
         "git",

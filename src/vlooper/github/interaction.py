@@ -1,6 +1,9 @@
+"""Module for interacting with GitHub via CLI (gh)."""
+
 from vlooper.config import config
 from vlooper.utils import build_gh_view_cmd, run_command
 from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
+from vlooper.exceptions import VLooperError
 
 
 def post_github_comment(task, message):
@@ -63,8 +66,6 @@ def create_pr(repo_full_name, repo_dir, branch_name):
         timeout=config.execution_timeout,
     )
     if err:
-        from vlooper.exceptions import VLooperError
-
         raise VLooperError(err)
 
     details = get_pr_details(repo_full_name, branch_name)
@@ -93,6 +94,7 @@ def get_issue_context(task, repo_full_name):
 
 
 def get_pr_context(task, repo_full_name):
+    """Fetch context for the task from a Pull Request on GitHub."""
     try:
         details = get_pr_details(repo_full_name, task["branch_name"])
         if not details:
