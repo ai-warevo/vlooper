@@ -176,3 +176,32 @@ def delete_remote_branch(repo_dir, branch_name):
     )
     if err:
         logger.info("ℹ️ Note: Could not delete remote branch %s: %s", branch_name, err)
+
+
+def filter_ignored_lines(repo_dir: str, text: str) -> str:
+    """Filter out lines from the text that are in .gitignore."""
+    if not text.strip():
+        return text
+
+    lines = text.splitlines()
+    input_text = "\n".join(lines)
+
+    try:
+        cmd = ["git", "check-ignore", "--stdin"]
+        stdout, err = run_command(cmd, cwd=repo_dir, input=input_text)
+
+        if err:
+            return text
+
+        ignored_paths = set(stdout.splitlines())
+
+        filtered_lines = [
+            line for line in lines
+            if line.strip() not in ignored_paths and line.strip() != ""
+        ]
+
+        return "\n".join(filtered_lines)
+    except Exception as e:
+        logger.warning("Failed to filter ignored lines via git: %s", e)
+        return text
+

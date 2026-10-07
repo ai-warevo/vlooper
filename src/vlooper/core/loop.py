@@ -5,6 +5,7 @@ import shlex
 from vlooper.config import config
 from vlooper.core import error_handler
 from vlooper.core.models import AttemptInfo, LoopState
+from vlooper.integrations import git_manager
 from vlooper.logger import get_logger
 from vlooper.utils import run_command
 
@@ -176,8 +177,9 @@ class AILoop:
             self.db.fail_task(info.task_id, err)
             return True
 
-        state.ctx += "\\nThe previous attempt failed with the following errors:"
-        state.ctx += f"\\n{err}\\nPlease fix these issues and try again."
+        state.ctx += "\nThe previous attempt failed with the following errors:"
+        filtered_err = git_manager.filter_ignored_lines(info.repo_dir, err)
+        state.ctx += f"\n{filtered_err}\nPlease fix these issues and try again."
         # Note: self.db.fail_task is called at the end of the loop or when failing task in engine,
         # but here it's used to mark as failed if stuck.
 
