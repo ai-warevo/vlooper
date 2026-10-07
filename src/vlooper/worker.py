@@ -279,11 +279,14 @@ class Worker:  # pylint: disable=too-few-public-methods
                     task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
                 )
 
-            # 1. Run Opencode (Agent execution) - Requirement 4: 1800s timeout
+            # 1. Run Opencode (Agent execution) - Requirement 4: opencode_run_timeout
             print("🤖 Running Opencode agent...")
             opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
             _, err = run_command(
-                opencode_cmd, cwd=repo_dir, timeout=1800, truncate_lines=50
+                opencode_cmd,
+                cwd=repo_dir,
+                timeout=config.opencode_run_timeout,
+                truncate_lines=50,
             )
 
             if err:
@@ -302,12 +305,12 @@ class Worker:  # pylint: disable=too-few-public-methods
                 self.db.fail_task(task_id, err)
                 continue
 
-            # 2. Run Tests - Requirement 4: 30s timeout
+            # 2. Run Tests - Requirement 4: test_run_timeout
             print(f"🧪 Running tests: {config.test_command}")
             _, test_err = run_command(
                 shlex.split(config.test_command),
                 cwd=repo_dir,
-                timeout=30,
+                timeout=config.test_run_timeout,
                 truncate_lines=50,
             )
 
