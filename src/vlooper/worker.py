@@ -3,6 +3,7 @@
 import os
 import re
 import shlex
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from vlooper.config import config
@@ -10,6 +11,15 @@ from vlooper.database import Database
 from vlooper.exceptions import VLooperError
 from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
 from vlooper.utils import build_gh_view_cmd, run_command
+
+
+@dataclass
+class LoopState:
+    """Контейнер для отслеживания состояния цикла Opencode."""
+
+    ctx: str
+    last_err_snip: str | None = None
+    consecutive_errs: int = 0
 
 
 class Worker:  # pylint: disable=too-few-public-methods
@@ -320,7 +330,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         # Fallback to cleaning the snippet if LLM fails
         return self._clean_snippet(err_text)
 
-    def _is_stuck(self, new_snip: str, last_err_snip: str) -> bool:
+    def _is_stuck(self, new_snip: str, last_err_snip: str | None) -> bool:
         """Check if two error snippets are semantically similar."""
         if last_err_snip is None:
             return False
@@ -401,14 +411,11 @@ class Worker:  # pylint: disable=too-few-public-methods
 
     def _run_opencode_loop(self, task, task_id, ctx, repo_dir):
         """Run the agent-driven loop: Write -> Test -> Fix."""
-        success = False
-        last_err_snip = None
-        consecutive_errs = 0
         max_attempts = config.max_retries + 1
         error_summaries = []
+        state = LoopState(ctx=ctx)
 
         for attempt in range(1, max_attempts + 1):
-            # Record the git status at the start of each attempt to track progress.
             pre_attempt_status, _ = run_command(
                 ["git", "status", "--porcelain"], cwd=repo_dir
             )
@@ -416,29 +423,25 @@ class Worker:  # pylint: disable=too-few-public-methods
             if attempt > 1:
                 self._notify_retry_attempt(task, attempt, max_attempts)
 
-            # 1. Run Opencode (Agent execution) - Requirement 4: opencode_run_timeout
-            err = self._execute_opencode_agent(ctx, repo_dir)
+            # 1. Run Opencode (Agent execution)
+            err = self._execute_opencode_agent(state.ctx, repo_dir)
 
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                is_stuck, consecutive_errs, last_err_snip, ctx = (
-                    self._handle_attempt_failure(
-                        err=err,
-                        task_id=task_id,
-                        attempt=attempt,
-                        pre_attempt_status=pre_attempt_status,
-                        repo_dir=repo_dir,
-                        error_summaries=error_summaries,
-                        last_err_snip=last_err_snip,
-                        consecutive_errs=consecutive_errs,
-                        ctx=ctx,
-                    )
+                is_stuck = self._handle_attempt_failure(
+                    err=err,
+                    task_id=task_id,
+                    attempt=attempt,
+                    pre_attempt_status=pre_attempt_status,
+                    repo_dir=repo_dir,
+                    error_summaries=error_summaries,
+                    state=state,
                 )
                 if is_stuck:
                     break
                 continue
 
-            # 2. Run Tests - Requirement 4: test_run_timeout
+            # 2. Run Tests
             test_err = self._execute_tests(repo_dir)
 
             if test_err is None:
@@ -447,23 +450,19 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
-            is_stuck, consecutive_errs, last_err_snip, ctx = (
-                self._handle_attempt_failure(
-                    err=test_err,
-                    task_id=task_id,
-                    attempt=attempt,
-                    pre_attempt_status=pre_attempt_status,
-                    repo_dir=repo_dir,
-                    error_summaries=error_summaries,
-                    last_err_snip=last_err_snip,
-                    consecutive_errs=consecutive_errs,
-                    ctx=ctx,
-                )
+            is_stuck = self._handle_attempt_failure(
+                err=test_err,
+                task_id=task_id,
+                attempt=attempt,
+                pre_attempt_status=pre_attempt_status,
+                repo_dir=repo_dir,
+                error_summaries=error_summaries,
+                state=state,
             )
             if is_stuck:
                 break
 
-        return success
+        return False
 
     def _notify_retry_attempt(self, task, attempt, max_attempts):
         """Print and post a comment about the retry status."""
@@ -513,11 +512,9 @@ class Worker:  # pylint: disable=too-few-public-methods
         pre_attempt_status,
         repo_dir,
         error_summaries,
-        last_err_snip,
-        consecutive_errs,
-        ctx,
+        state: LoopState,
     ):
-        """Process an execution/test error, check if the agent is stuck, and update context."""
+        """Process an execution/test error, check if the agent is stuck, and update state."""
         snip = self._truncate_output(err, lines=15)
         post_attempt_status, _ = run_command(
             ["git", "status", "--porcelain"], cwd=repo_dir
@@ -533,22 +530,22 @@ class Worker:  # pylint: disable=too-few-public-methods
 
         is_stuck = (
             is_loop
-            or self._is_stuck(snip, last_err_snip)
+            or self._is_stuck(snip, state.last_err_snip)
             or (attempt > 1 and not made_changes)
         )
-        consecutive_errs = consecutive_errs + 1 if is_stuck else 1
-        last_err_snip = snip
+        state.consecutive_errs = state.consecutive_errs + 1 if is_stuck else 1
+        state.last_err_snip = snip
 
-        if consecutive_errs >= 2:
+        if state.consecutive_errs >= 2:
             print("🚨 Agent stuck! Loop detected or same error twice. Breaking loop.")
             self.db.fail_task(task_id, err)
-            return True, consecutive_errs, last_err_snip, ctx
+            return True
 
-        ctx += "\nThe previous attempt failed with the following errors:"
-        ctx += f"\n{err}\nPlease fix these issues and try again."
+        state.ctx += "\nThe previous attempt failed with the following errors:"
+        state.ctx += f"\n{err}\nPlease fix these issues and try again."
         self.db.fail_task(task_id, err)
 
-        return False, consecutive_errs, last_err_snip, ctx
+        return False
 
     def _commit_and_push(self, repo_dir, branch_name, commit_msg):
         print("💾 Committing changes...")
