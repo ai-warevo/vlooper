@@ -40,24 +40,28 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
         task_id = task["id"]
 
         logger.info(
-            f"🛠 Picking up task #{task_id}: {task['task_type']} in "
-            f"{task['repo_full_name']} (branch: {task['branch_name']})"
+            "🛠 Picking up task #%s: %s in %s (branch: %s)",
+            task_id,
+            task["task_type"],
+            task["repo_full_name"],
+            task["branch_name"],
         )
-        logger.debug(f"Task payload for #{task_id}: {task}")
+        logger.debug("Task payload for #%s: %s", task_id, task)
 
         if not self.db.claim_task(task_id):
             logger.warning(
-                f"Failed to claim task #{task_id}. It might have been picked up by another instance."
+                "Failed to claim task #%s. It might have an existing instance.",
+                task_id,
             )
             return False  # Someone else claimed it
 
-        logger.debug(f"Successfully claimed task #{task_id}.")
+        logger.debug("Successfully claimed task #%s.", task_id)
 
         # Post 'Started' comment
         self._post_github_comment(task, "🤖 vLooper has picked up this task.")
 
         try:
-            logger.debug(f"Executing task #{task_id}...")
+            logger.debug("Executing task #%s...", task_id)
             success, pr_number = self._execute_task(task, task_id)
             if success:
                 self.db.complete_task(task_id)
@@ -68,17 +72,18 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
                     task,
                     f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}",
                 )
-                logger.info(f"✅ Task #{task_id} completed successfully.")
+                logger.info("✅ Task #%s completed successfully.", task_id)
             else:
                 raise VLooperError("Task execution failed (see logs).")
         except Exception as e:  # noqa: W0718
             error_msg = str(e)
-            logger.error(f"❌ Task #{task_id} failed: {error_msg}")
+            logger.error("❌ Task #%s failed: %s", task_id, error_msg)
             self.db.fail_task(task_id, error_msg)
 
             if self._is_terminal_failure(task_id):
                 logger.warning(
-                    f"📢 Task #{task_id} reached terminal failure. Escalating..."
+                    "📢 Task #%s reached terminal failure. Escalating...",
+                    task_id,
                 )
                 self._post_escalation_comment(task, error_msg)
 
@@ -150,7 +155,7 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
                         if details:
                             pr_number = details[0]
                     except Exception as e:
-                        logger.warning(f"⚠️ Could not retrieve PR details: {e}")
+                        logger.warning("⚠️ Could not retrieve PR details: %s", e)
             except VLooperError:
                 self._stash_and_checkout_main(repo_dir)
                 raise

@@ -10,16 +10,16 @@ logger = get_logger(__name__)
 
 def run_command(command: list[str]) -> int:
     """Runs a system command and returns its return code."""
-    logger.info(f"[{' '.join(command)}]▶️ Running...")
+    logger.info("[%s]▶️ Running...", " ".join(command))
     try:
         result = subprocess.run(command, check=False)
         if result.returncode == 0:
-            logger.info(f"[{' '.join(command)}]✅ Success!")
+            logger.info("[%s]✅ Success!", " ".join(command))
             return 0
-        logger.error(f"❌ Error! Return code: {result.returncode}")
+        logger.error("❌ Error! Return code: %s", result.returncode)
         return result.returncode
     except OSError as e:
-        logger.error(f"❌ Failed to run command: {e}")
+        logger.error("❌ Failed to run command: %s", e)
         return 1
 
 

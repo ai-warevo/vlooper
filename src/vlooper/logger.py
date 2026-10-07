@@ -1,3 +1,5 @@
+"""Module for configuring and accessing the logger."""
+
 import logging
 import sys
 

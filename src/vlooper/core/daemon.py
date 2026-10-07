@@ -30,12 +30,12 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
 
     def _handle_exit(self, _signum: int, _frame):
         """Handle exit signal."""
-        logger.info("\\n🛑 Stopping daemon...")
+        logger.info("\n🛑 Stopping daemon...")
         self.running = False
 
     def run(self, retry_failed=False):
         """Main execution loop."""
-        logger.debug(f"Using lock file: {self.lock_file}")
+        logger.debug("Using lock file: %s", self.lock_file)
 
         # Attempt to acquire an exclusive lock on the lock file
         with open(self.lock_file, "w", encoding="utf-8") as lock_fd:
@@ -50,7 +50,8 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                 sys.exit(1)
 
             logger.info(
-                f"🚀 vLooper Daemon started with lock acquired. (Retry mode: {retry_failed})"
+                "🚀 vLooper Daemon started with lock acquired. (Retry mode: %s)",
+                retry_failed,
             )
             while self.running:
                 try:
@@ -61,10 +62,10 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                     active_task = self.db.get_active_claimed_task()
                     if active_task:
                         logger.info(
-                            f"⏳ A task is already being processed (# {active_task['id']}). "
-                            "Waiting..."
+                            "⏳ A task is already being processed (# %s). Waiting...",
+                            active_task["id"],
                         )
-                        logger.debug(f"Active task detected in DB: {active_task}")
+                        logger.debug("Active task detected in DB: %s", active_task)
                     else:
                         # 3. Process the next pending task
                         logger.debug(
@@ -74,12 +75,13 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
 
                     # Sleep to avoid hammering everything
                     logger.debug(
-                        f"Loop iteration complete. Sleeping for {config.loop_sleep_seconds}s..."
+                        "Loop iteration complete. Sleeping for %ss...",
+                        config.loop_sleep_seconds,
                     )
                     time.sleep(config.loop_sleep_seconds)
 
                 except Exception as e:  # noqa: W0718
-                    logger.error(f"⚠️ Unexpected error in daemon loop: {e}")
+                    logger.error("⚠️ Unexpected error in daemon loop: %s", e)
                     logger.debug("Sleeping for error recovery period...")
                     time.sleep(config.error_wait_seconds)
 

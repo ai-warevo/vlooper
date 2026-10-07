@@ -25,7 +25,7 @@ def build_gh_view_cmd(
 
 def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None):
     """Run a shell command with an optional timeout and truncation."""
-    logger.debug(f"running command {cmd}")
+    logger.debug("running command %s", cmd)
     try:
         res = subprocess.run(
             cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False
@@ -47,9 +47,9 @@ def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None):
                 f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{stdout}\n"
                 f"STDERR:\n{stderr}"
             )
-            logger.debug(f"command failed with error: {error_msg}")
+            logger.debug("command failed with error: %s", error_msg)
             return None, error_msg
-        logger.debug(f"command success, stdout length: {len(res.stdout)}")
+        logger.debug("command success, stdout length: %d", len(res.stdout))
         return res.stdout.strip(), None
     except subprocess.TimeoutExpired as e:
         stdout = e.stdout.decode() if e.stdout else ""
