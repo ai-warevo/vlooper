@@ -2,20 +2,25 @@
 
 import subprocess
 import sys
+import logging
+
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_command(command: list[str]) -> int:
     """Runs a system command and returns its return code."""
-    print(f"[{' '.join(command)}]▶️ Running...")
+    logger.info(f"[{' '.join(command)}]▶️ Running...")
     try:
         result = subprocess.run(command, check=False)
         if result.returncode == 0:
-            print(f"[{' '.join(command)}]✅ Success!")
+            logger.info(f"[{' '.join(command)}]✅ Success!")
             return 0
-        print(f"❌ Error! Return code: {result.returncode}")
+        logger.error(f"❌ Error! Return code: {result.returncode}")
         return result.returncode
     except OSError as e:
-        print(f"❌ Failed to run command: {e}")
+        logger.error(f"❌ Failed to run command: {e}")
         return 1
 
 
@@ -31,7 +36,7 @@ def main() -> None:
 
     for cmd in commands:
         if run_command(cmd) != 0:
-            print("🚨 Some checks failed!")
+            logger.error("🚨 Some checks failed!")
             sys.exit(1)
 
 

@@ -1,10 +1,14 @@
 """Module for handling and summarizing errors encountered during execution."""
 
 import re
+import logging
 from difflib import SequenceMatcher
 
 from vlooper.config import config
 from vlooper.utils import run_command
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def truncate_output(output: str, lines: int = 50) -> str:
@@ -67,7 +71,7 @@ def get_error_summary(err_text: str) -> str:
         if stdout:
             return stdout.strip()
     except Exception as e:
-        print(f"⚠️ Error summarizing error: {e}")
+        logger.warning(f"Error summarizing error: {e}")
 
     # Fallback to cleaning the snippet if LLM fails
     return clean_snippet(err_text)
@@ -95,7 +99,7 @@ def is_stuck(new_snip: str, last_err_snip: str | None) -> bool:
         return False
 
     # Case 3: Ambiguous - use LLM for a second opinion
-    print(f"🤔 Similarity is {similarity:.2f}, using LLM to decide if stuck...")
+    logger.info(f"Similarity is {similarity:.2f}, using LLM to decide if stuck...")
     llm_decision = ask_llm_if_stuck(new_snip, last_err_snip)
 
     if llm_decision is not None:
@@ -111,7 +115,7 @@ def ask_llm_if_stuck(new_snip: str, last_err_snip: str) -> bool | None:
     Returns True/False if sure, or None if failed.
     """
     if not config.model.startswith("ollama/"):
-        print("⚠️ Model is not an Ollama model. Skipping LLM check.")
+        logger.warning("Model is not an Ollama model. Skipping LLM check.")
         return None
 
     try:
@@ -125,7 +129,7 @@ def ask_llm_if_stuck(new_snip: str, last_err_snip: str) -> bool | None:
             return parse_llm_stuck_response(stdout)
 
     except Exception as e:
-        print(f"⚠️ LLM stuck detection failed: {e}.")
+        logger.warning(f"LLM stuck detection failed: {e}.")
 
     return None
 
@@ -152,7 +156,7 @@ def parse_llm_stuck_response(stdout: str) -> bool | None:
     if re.search(r"\bNO\b", clean_resp):
         return False
 
-    print(f"❓ LLM returned ambiguous response: '{stdout.strip()}'")
+    logger.warning(f"LLM returned ambiguous response: '{stdout.strip()}'")
     return None
 
 

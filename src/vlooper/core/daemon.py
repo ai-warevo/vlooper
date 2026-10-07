@@ -4,11 +4,15 @@ import fcntl
 import signal
 import sys
 import time
+import logging
 
 from vlooper.config import config
 from vlooper.core.engine import TaskEngine
 from vlooper.core.scanner import Scanner
 from vlooper.database import Database
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class VLooperDaemon:  # pylint: disable=too-few-public-methods
@@ -27,7 +31,7 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
 
     def _handle_exit(self, _signum: int, _frame):
         """Handle exit signal."""
-        print("\n🛑 Stopping daemon...")
+        logger.info("\n🛑 Stopping daemon...")
         self.running = False
 
     def run(self, retry_failed=False):
@@ -37,10 +41,12 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError:
-                print("❌ Another instance of vLooper is already running. Exiting.")
+                logger.error(
+                    "❌ Another instance of vLooper is already running. Exiting."
+                )
                 sys.exit(1)
 
-            print(
+            logger.info(
                 f"🚀 vLooper Daemon started with lock acquired. (Retry mode: {retry_failed})"
             )
             while self.running:
@@ -51,7 +57,7 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                     # 2. Check if a worker is already active (as a secondary check)
                     active_task = self.db.get_active_claimed_task()
                     if active_task:
-                        print(
+                        logger.info(
                             f"⏳ A task is already being processed (# {active_task['id']}). "
                             "Waiting..."
                         )
@@ -63,10 +69,10 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                     time.sleep(config.loop_sleep_seconds)
 
                 except Exception as e:  # noqa: W0718
-                    print(f"⚠️ Unexpected error in daemon loop: {e}")
+                    logger.error(f"⚠️ Unexpected error in daemon loop: {e}")
                     time.sleep(config.error_wait_seconds)
 
-        print("👋 Daemon shut down.")
+        logger.info("👋 Daemon shut down.")
 
 
 def main(retry_failed=False):

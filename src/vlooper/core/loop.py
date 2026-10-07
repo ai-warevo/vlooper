@@ -1,11 +1,15 @@
 """Implementation of the agent-driven loop mechanism."""
 
 import shlex
+import logging
 
 from vlooper.config import config
 from vlooper.core import error_handler
 from vlooper.core.models import AttemptInfo, LoopState
 from vlooper.utils import run_command
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class AILoop:
@@ -33,7 +37,7 @@ class AILoop:
             err = self._execute_opencode_agent(state.ctx, repo_dir)
 
             if err:
-                print(f"⚠️ Opencode error on attempt {attempt}: {err}")
+                logger.warning(f"⚠️ Opencode error on attempt {attempt}: {err}")
                 attempt_info = AttemptInfo(
                     task_id=task_id,
                     attempt=attempt,
@@ -54,11 +58,11 @@ class AILoop:
             test_err = self._execute_tests(repo_dir)
 
             if test_err is None:
-                print(f"🎉 Tests passed on attempt {attempt}!")
+                logger.info(f"🎉 Tests passed on attempt {attempt}!")
                 return True
 
             # Step C (Evaluate/Feedback) - Failure logic
-            print(f"❌ Tests failed on attempt {attempt}.")
+            logger.error(f"❌ Tests failed on attempt {attempt}.")
             attempt_info = AttemptInfo(
                 task_id=task_id,
                 attempt=attempt,
@@ -78,14 +82,14 @@ class AILoop:
 
     def _notify_retry_attempt(self, task, attempt, max_attempts):
         """Print and post a comment about the retry status."""
-        print(f"🔄 Attempt {attempt}/{max_attempts}...")
+        logger.info(f"🔄 Attempt {attempt}/{max_attempts}...")
         self._post_github_comment(
             task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
         )
 
     def _execute_opencode_agent(self, ctx, repo_dir):
         """Run the Opencode agent command and return any stderr/error content."""
-        print("🤖 Running Opencode agent...")
+        logger.info("🤖 Running Opencode agent...")
         opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
         _, err = run_command(
             opencode_cmd,
@@ -97,7 +101,7 @@ class AILoop:
 
     def _execute_tests(self, repo_dir):
         """Run the configured test suite command and return any stderr/error content."""
-        print(f"🧪 Running tests: {config.test_command}")
+        logger.info(f"🧪 Running tests: {config.test_command}")
         _, test_err = run_command(
             shlex.split(config.test_command),
             cwd=repo_dir,
@@ -136,7 +140,9 @@ class AILoop:
         state.last_err_snip = snip
 
         if state.consecutive_errs >= 2:
-            print("🚨 Agent stuck! Loop detected or same error twice. Breaking loop.")
+            logger.error(
+                "🚨 Agent stuck! Loop detected or same error twice. Breaking loop."
+            )
             self.db.fail_task(info.task_id, err)
             return True
 

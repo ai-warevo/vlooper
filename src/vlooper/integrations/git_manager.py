@@ -1,10 +1,14 @@
 """Module for managing git operations like repo cloning, branch setup, and committing."""
 
 import os
+import logging
 
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.utils import run_command
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def prepare_repo_dir(repo_full_name, repo_short_name):
@@ -14,14 +18,14 @@ def prepare_repo_dir(repo_full_name, repo_short_name):
     repo_dir = os.path.join(base_dir, repo_short_name)
 
     if not os.path.exists(repo_dir):
-        print(f"📦 Cloning repository {repo_full_name}...")
+        logger.info(f"📦 Cloning repository {repo_full_name}...")
         _, err = run_command(
             ["gh", "repo", "clone", repo_full_name, repo_short_name], cwd=base_dir
         )
         if err:
             raise VLooperError(err)
 
-    print("🧹 Resetting to default branch...")
+    logger.info("🧹 Resetting to default branch...")
     base_branch = "main"
     for b in ["main", "master"]:
         _, err = run_command(["git", "rev-parse", "--verify", b], cwd=repo_dir)
@@ -43,13 +47,13 @@ def prepare_repo_dir(repo_full_name, repo_short_name):
         timeout=config.execution_timeout,
     )
     if err:
-        print(f"⚠️ Could not pull origin {base_branch}, proceeding anyway.")
+        logger.warning(f"⚠️ Could not pull origin {base_branch}, proceeding anyway.")
     return repo_dir
 
 
 def setup_branch(repo_dir, branch_name, task_type):
     """Sets up a new git branch for the given task type."""
-    print(f"🌿 Preparing branch {branch_name}...")
+    logger.info(f"🌿 Preparing branch {branch_name}...")
     _, err = run_command(
         ["git", "checkout", "-B", branch_name],
         cwd=repo_dir,
@@ -59,7 +63,7 @@ def setup_branch(repo_dir, branch_name, task_type):
         raise VLooperError(err)
 
     if task_type == "PR":
-        print(f"📥 Pulling remote branch {branch_name}...")
+        logger.info(f"📥 Pulling remote branch {branch_name}...")
         _, err = run_command(
             ["git", "pull", "origin", branch_name],
             cwd=repo_dir,
@@ -72,7 +76,7 @@ def setup_branch(repo_dir, branch_name, task_type):
 
 def commit_and_push(repo_dir, branch_name, commit_msg):
     """Commits changes and pushes the branch to origin."""
-    print("💾 Committing changes...")
+    logger.info("💾 Committing changes...")
     commit_cmd = [
         "git",
         "-c",
@@ -87,7 +91,7 @@ def commit_and_push(repo_dir, branch_name, commit_msg):
     if err:
         raise VLooperError(err)
 
-    print("📤 Pushing to origin...")
+    logger.info("📤 Pushing to origin...")
     push_cmd = ["git", "push", "origin", branch_name]
     _, err = run_command(push_cmd, cwd=repo_dir, timeout=config.execution_timeout)
     if err:
@@ -97,7 +101,7 @@ def commit_and_push(repo_dir, branch_name, commit_msg):
 
 def stash_and_checkout_main(repo_dir):
     """Stash changes and checkout default branch if a push or PR creation fails."""
-    print("🧹 Stashing changes and checking out default branch...")
+    logger.info("🧹 Stashing changes and checking out default branch...")
     run_command(["git", "stash"], cwd=repo_dir)
     base_branch = "main"
     for b in ["main", "master"]:
@@ -112,12 +116,12 @@ def stash_and_checkout_main(repo_dir):
         timeout=config.execution_timeout,
     )
     if err:
-        print(f"⚠️ Failed to checkout default branch during cleanup: {err}")
+        logger.warning(f"⚠️ Failed to checkout default branch during cleanup: {err}")
 
 
 def delete_local_branch(repo_dir, branch_name):
     """Delete the local git branch after work is done."""
-    print(f"🗑 Deleting local branch {branch_name}...")
+    logger.info(f"🗑 Deleting local branch {branch_name}...")
     # 1. Forcefully clean up any uncommitted changes
     # or untracked files to allow switching branches.
     run_command(["git", "reset", "--hard", "HEAD"], cwd=repo_dir)
@@ -132,7 +136,9 @@ def delete_local_branch(repo_dir, branch_name):
             break
 
     if not switched:
-        print("⚠️ Could not checkout main/master, attempting to detach HEAD...")
+        logger.warning(
+            "⚠️ Could not checkout main/master, attempting to detach HEAD..."
+        )
         _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
         if not err:
             switched = True
@@ -140,14 +146,14 @@ def delete_local_branch(repo_dir, branch_name):
     # 3. Delete the branch.
     _, err = run_command(["git", "branch", "-D", branch_name], cwd=repo_dir)
     if err:
-        print(f"ℹ️ Note: Could not delete local branch {branch_name}: {err}")
+        logger.info(f"ℹ️ Note: Could not delete local branch {branch_name}: {err}")
 
 
 def delete_remote_branch(repo_dir, branch_name):
     """Attempt to delete the remote git branch."""
-    print(f"🗑 Attempting to delete remote branch {branch_name}...")
+    logger.info(f"🗑 Attempting to delete remote branch {branch_name}...")
     _, err = run_command(
         ["git", "push", "origin", "--delete", branch_name], cwd=repo_dir
     )
     if err:
-        print(f"ℹ️ Note: Could not delete remote branch {branch_name}: {err}")
+        logger.info(f"ℹ️ Note: Could not delete remote branch {branch_name}: {err}")

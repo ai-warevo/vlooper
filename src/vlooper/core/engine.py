@@ -1,5 +1,7 @@
 """TaskEngine module to orchestrate task execution."""
 
+import logging
+
 from vlooper.config import config
 from vlooper.core import error_handler
 from vlooper.core.exceptions import VLooperError
@@ -7,6 +9,9 @@ from vlooper.core.loop import AILoop
 from vlooper.database import Database
 from vlooper.integrations import git_manager
 from vlooper.integrations import github_interaction as interaction
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TaskEngine:  # pylint: disable=too-few-public-methods
@@ -35,7 +40,7 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
         task = tasks[0]
         task_id = task["id"]
 
-        print(
+        logger.info(
             f"🛠 Picking up task #{task_id}: {task['task_type']} in "
             f"{task['repo_full_name']} (branch: {task['branch_name']})"
         )
@@ -57,16 +62,18 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
                     task,
                     f"✅ Task completed successfully!\n@{mention} check this out:{pr_suffix}",
                 )
-                print(f"✅ Task #{task_id} completed successfully.")
+                logger.info(f"✅ Task #{task_id} completed successfully.")
             else:
                 raise VLooperError("Task execution failed (see logs).")
         except Exception as e:  # noqa: W0718
             error_msg = str(e)
-            print(f"❌ Task #{task_id} failed: {error_msg}")
+            logger.error(f"❌ Task #{task_id} failed: {error_msg}")
             self.db.fail_task(task_id, error_msg)
 
             if self._is_terminal_failure(task_id):
-                print(f"📢 Task #{task_id} reached terminal failure. Escalating...")
+                logger.warning(
+                    f"📢 Task #{task_id} reached terminal failure. Escalating..."
+                )
                 self._post_escalation_comment(task, error_msg)
 
             return False
@@ -137,7 +144,7 @@ class TaskEngine:  # pylint: disable=too-few-public-methods
                         if details:
                             pr_number = details[0]
                     except Exception as e:
-                        print(f"⚠️ Could not retrieve PR details: {e}")
+                        logger.warning(f"⚠️ Could not retrieve PR details: {e}")
             except VLooperError:
                 self._stash_and_checkout_main(repo_dir)
                 raise

@@ -60,6 +60,10 @@ class Config:  # pylint: disable=too-many-instance-attributes
             "WORKSPACE_BASE_DIR", os.path.expanduser("~/ai_agent/workspace")
         )
     )
+    log_level: str = field(default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO"))
+    log_file: str | None = field(
+        default_factory=lambda: os.environ.get("LOG_FILE", None)
+    )
 
 
 config = Config()

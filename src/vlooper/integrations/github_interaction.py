@@ -1,5 +1,7 @@
 """Module for interacting with GitHub via CLI (gh)."""
 
+import logging
+
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.integrations.github_client import (
@@ -8,6 +10,9 @@ from vlooper.integrations.github_client import (
     get_pr_details,
 )
 from vlooper.utils import build_gh_view_cmd, run_command
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def post_github_comment(task, message):
@@ -34,13 +39,15 @@ def post_github_comment(task, message):
                 ]
                 _, err = run_command(comment_cmd)
                 if err:
-                    print(f"⚠️ Failed to post GitHub comment for #{num}: {err}")
+                    logger.warning(f"Failed to post GitHub comment for #{num}: {err}")
             else:
-                print(f"⚠️ Could not find issue number in branch name: {branch_name}")
+                logger.warning(
+                    f"Could not find issue number in branch name: {branch_name}"
+                )
         except Exception as e:  # noqa: W0718
-            print(f"⚠️ Error posting GitHub comment: {e}")
+            logger.error(f"Error posting GitHub comment: {e}")
     elif task_type == "PR":
-        print("TODO: pr comment logic ...")
+        logger.debug("TODO: pr comment logic ...")
         # For PRs, this is handled by different logic or requires more state.
 
 
@@ -61,7 +68,7 @@ def get_github_author(task):
 
 def create_pr(repo_full_name, repo_dir, branch_name):
     """Creates a Pull Request."""
-    print("📢 Creating Pull Request...")
+    logger.info("Creating Pull Request...")
     _, err = create_pull_request(
         repo_full_name,
         f"Fix for {branch_name}",

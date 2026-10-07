@@ -1,10 +1,14 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
 import json
+import logging
 
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.utils import build_gh_view_cmd, run_command
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class Scanner:  # pylint: disable=too-few-public-methods
@@ -17,10 +21,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
         if retry_failed:
-            print("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
+            logger.info("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
 
-        print(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
+        logger.info(f"🔍 Scanning for new tasks in organization: {config.org_name}...")
         self._scan_issues()
         self._scan_prs()
 
@@ -33,10 +37,12 @@ class Scanner:  # pylint: disable=too-few-public-methods
         if not failed_tasks:
             return
 
-        print(f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them...")
+        logger.info(
+            f"♻️ Found {len(failed_tasks)} stale failed tasks. Resetting them..."
+        )
         for task in failed_tasks:
             self.db.reset_task_status(task["id"])
-            print(f"   ✅ Task #{task['id']} reset to PENDING.")
+            logger.info(f"   ✅ Task #{task['id']} reset to PENDING.")
 
     def _scan_issues(self):
         """Scan for open issues assigned to the bot."""
@@ -58,7 +64,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
         try:
             issues = json.loads(issues_json)
         except json.JSONDecodeError:
-            print("Failed to parse issues JSON.")
+            logger.error("Failed to parse issues JSON.")
             return
 
         for issue in issues:
@@ -91,7 +97,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
         try:
             prs = json.loads(prs_json)
         except json.JSONDecodeError:
-            print("Failed to parse PRs JSON.")
+            logger.error("Failed to parse PRs JSON.")
             return
 
         for pr in prs:
@@ -115,4 +121,4 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 if branch:
                     self.db.add_task("PR", repo_full_name, branch)
             except (json.JSONDecodeError, KeyError):
-                print(f"Failed to parse PR details for #{num}")
+                logger.error(f"Failed to parse PR details for #{num}")

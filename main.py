@@ -3,6 +3,7 @@ import sys
 import os
 import argparse
 from pathlib import Path
+import logging
 
 # Support src layout for local execution
 sys.path.append(str(Path(__file__).parent / "src"))
@@ -18,7 +19,12 @@ try:
 except ImportError:
     VLooperTUI = None
 
+from vlooper.logger import setup_logging, get_logger
+
+logger = get_logger(__name__)
+
 def main():
+    setup_logging()
     parser = argparse.ArgumentParser(description="vLooper Daemon")
     parser.add_argument("--tui", action="store_true", help="Run the TUI dashboard")
     parser.add_argument("--retry-failed", action="store_true", help="Retry failed tasks from database")
@@ -26,7 +32,7 @@ def main():
 
     if args.tui:
         if VLooperTUI is None:
-            print("❌ TUI module not found.")
+            logger.error("❌ TUI module not found.")
             sys.exit(1)
         app = VLooperTUI()
         app.run()
@@ -34,7 +40,7 @@ def main():
 
     # Standard Daemon execution
     if "GH_TOKEN" not in os.environ:
-        print("⚠️ Warning: GH_TOKEN is not set. Some GitHub operations might fail.")
+        logger.warning("⚠️ Warning: GH_TOKEN is not set. Some GitHub operations might fail.")
     
     daemon = VLooperDaemon()
     daemon.run(retry_failed=args.retry_failed)
