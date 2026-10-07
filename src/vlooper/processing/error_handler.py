@@ -2,6 +2,7 @@
 
 import re
 from difflib import SequenceMatcher
+
 from vlooper.config import config
 from vlooper.utils import run_command
 

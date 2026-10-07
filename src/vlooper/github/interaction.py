@@ -1,9 +1,9 @@
 """Module for interacting with GitHub via CLI (gh)."""
 
 from vlooper.config import config
-from vlooper.utils import build_gh_view_cmd, run_command
-from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
 from vlooper.exceptions import VLooperError
+from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
+from vlooper.utils import build_gh_view_cmd, run_command
 
 
 def post_github_comment(task, message):

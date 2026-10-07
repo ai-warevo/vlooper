@@ -1,9 +1,10 @@
 """Module for managing git operations like repo cloning, branch setup, and committing."""
 
 import os
+
 from vlooper.config import config
-from vlooper.utils import run_command
 from vlooper.exceptions import VLooperError
+from vlooper.utils import run_command
 
 
 def prepare_repo_dir(repo_full_name, repo_short_name):

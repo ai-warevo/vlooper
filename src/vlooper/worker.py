@@ -6,11 +6,10 @@ from dataclasses import dataclass
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.exceptions import VLooperError
-from vlooper.utils import run_command
-
-from vlooper.processing import error_handler
 from vlooper.git import manager as git_manager
 from vlooper.github import interaction
+from vlooper.processing import error_handler
+from vlooper.utils import run_command
 
 
 @dataclass
