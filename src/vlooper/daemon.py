@@ -5,6 +5,7 @@ import signal
 import sys
 import time
 
+from vlooper.config import config
 from vlooper.database import Database
 from vlooper.scanner import Scanner
 from vlooper.worker import Worker
@@ -59,11 +60,11 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                         self.worker.process_next_task()
 
                     # Sleep to avoid hammering everything
-                    time.sleep(30)
+                    time.sleep(config.loop_sleep_seconds)
 
                 except Exception as e:  # noqa: W0718
                     print(f"⚠️ Unexpected error in daemon loop: {e}")
-                    time.sleep(10)
+                    time.sleep(config.error_wait_seconds)
 
         print("👋 Daemon shut down.")
 
