@@ -149,38 +149,42 @@ class Worker:  # pylint: disable=too-few-public-methods
         if not repo_dir:
             return False, None
 
-        if not self._setup_branch(repo_dir, branch_name, task_type):
-            return False, None
-
-        # 4. Run Opencode Loop
-        success = self._run_opencode_loop(task, task_id, context, repo_dir)
-        if not success:
-            raise VLooperError(
-                "Task failed after reaching maximum attempts or getting stuck."
-            )
-
-        # 5 & 6. Commit, Push and Create PR (Delivery)
-        pr_number = None
         try:
-            if not self._commit_and_push(repo_dir, branch_name, commit_msg):
+            if not self._setup_branch(repo_dir, branch_name, task_type):
                 return False, None
 
-            # 6. Create PR if it was an issue
-            if task_type == "ISSUE":
-                pr_number = self._create_pr(repo_full_name, repo_dir, branch_name)
-            elif task_type == "PR":
-                # Try to find existing PR number for a refinement task
-                try:
-                    details = get_pr_details(repo_full_name, branch_name)
-                    if details:
-                        pr_number = details[0]
-                except Exception as e:
-                    print(f"⚠️ Could not retrieve PR details: {e}")
-        except VLooperError:
-            self._stash_and_checkout_main(repo_dir)
-            raise
+            # 4. Run Opencode Loop
+            success = self._run_opencode_loop(task, task_id, context, repo_dir)
+            if not success:
+                raise VLooperError(
+                    "Task failed after reaching maximum attempts or getting stuck."
+                )
 
-        return True, pr_number
+            # 5 & 6. Commit, Push and Create PR (Delivery)
+            pr_number = None
+            try:
+                if not self._commit_and_push(repo_dir, branch_name, commit_msg):
+                    return False, None
+
+                # 6. Create PR if it was an issue
+                if task_type == "ISSUE":
+                    pr_number = self._create_pr(repo_full_name, repo_dir, branch_name)
+                elif task_type == "PR":
+                    # Try to find existing PR number for a refinement task
+                    try:
+                        details = get_pr_details(repo_full_name, branch_name)
+                        if details:
+                            pr_number = details[0]
+                    except Exception as e:
+                        print(f"⚠️ Could not retrieve PR details: {e}")
+            except VLooperError:
+                self._stash_and_checkout_main(repo_dir)
+                raise
+
+            return True, pr_number
+        finally:
+            self._delete_local_branch(repo_dir, branch_name)
+            self._delete_remote_branch(repo_dir, branch_name)
 
     def _generate_commit_message(self, task, branch_name):
         task_type = task["task_type"]
@@ -205,20 +209,29 @@ class Worker:  # pylint: disable=too-few-public-methods
             if err:
                 raise VLooperError(err)
 
-        print("🧹 Resetting to main...")
+        print("🧹 Resetting to default branch...")
+        base_branch = "main"
+        for b in ["main", "master"]:
+            _, err = run_command(["git", "rev-parse", "--verify", b], cwd=repo_dir)
+            if not err:
+                base_branch = b
+                break
+
         _, err = run_command(
-            ["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout
+            ["git", "checkout", "-f", base_branch],
+            cwd=repo_dir,
+            timeout=config.execution_timeout,
         )
         if err:
             raise VLooperError(err)
 
         _, err = run_command(
-            ["git", "pull", "origin", "main"],
+            ["git", "pull", "origin", base_branch],
             cwd=repo_dir,
             timeout=config.execution_timeout,
         )
         if err:
-            print("⚠️ Could not pull origin main, proceeding anyway.")
+            print(f"⚠️ Could not pull origin {base_branch}, proceeding anyway.")
         return repo_dir
 
     def _setup_branch(self, repo_dir, branch_name, task_type):
@@ -266,11 +279,11 @@ class Worker:  # pylint: disable=too-few-public-methods
                     task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
                 )
 
-            # 1. Run Opencode (Agent execution) - Requirement 4: 90s timeout
+            # 1. Run Opencode (Agent execution) - Requirement 4: 1800s timeout
             print("🤖 Running Opencode agent...")
             opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
             _, err = run_command(
-                opencode_cmd, cwd=repo_dir, timeout=90, truncate_lines=50
+                opencode_cmd, cwd=repo_dir, timeout=1800, truncate_lines=50
             )
 
             if err:
@@ -360,14 +373,59 @@ class Worker:  # pylint: disable=too-few-public-methods
         return None
 
     def _stash_and_checkout_main(self, repo_dir):
-        """Stash changes and checkout main if a push or PR creation fails."""
-        print("🧹 Stashing changes and checking out main...")
+        """Stash changes and checkout default branch if a push or PR creation fails."""
+        print("🧹 Stashing changes and checking out default branch...")
         run_command(["git", "stash"], cwd=repo_dir)
+        base_branch = "main"
+        for b in ["main", "master"]:
+            _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
+            if not err:
+                base_branch = b
+                break
+
         _, err = run_command(
-            ["git", "checkout", "main"], cwd=repo_dir, timeout=config.execution_timeout
+            ["git", "checkout", "-f", base_branch],
+            cwd=repo_dir,
+            timeout=config.execution_timeout,
         )
         if err:
-            print(f"⚠️ Failed to checkout main during cleanup: {err}")
+            print(f"⚠️ Failed to checkout default branch during cleanup: {err}")
+
+    def _delete_local_branch(self, repo_dir, branch_name):
+        """Delete the local git branch after work is done."""
+        print(f"🗑 Deleting local branch {branch_name}...")
+        # 1. Forcefully clean up any uncommitted changes
+        # or untracked files to allow switching branches.
+        run_command(["git", "reset", "--hard", "HEAD"], cwd=repo_dir)
+        run_command(["git", "clean", "-fd"], cwd=repo_dir)
+
+        # 2. Switch back to a default branch (main or master).
+        switched = False
+        for b in ["main", "master"]:
+            _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
+            if not err:
+                switched = True
+                break
+
+        if not switched:
+            print("⚠️ Could not checkout main/master, attempting to detach HEAD...")
+            _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
+            if not err:
+                switched = True
+
+        # 3. Delete the branch.
+        _, err = run_command(["git", "branch", "-D", branch_name], cwd=repo_dir)
+        if err:
+            print(f"ℹ️ Note: Could not delete local branch {branch_name}: {err}")
+
+    def _delete_remote_branch(self, repo_dir, branch_name):
+        """Attempt to delete the remote git branch."""
+        print(f"🗑 Attempting to delete remote branch {branch_name}...")
+        _, err = run_command(
+            ["git", "push", "origin", "--delete", branch_name], cwd=repo_dir
+        )
+        if err:
+            print(f"ℹ️ Note: Could not delete remote branch {branch_name}: {err}")
 
     def _get_context(self, task, repo_full_name):
         """Fetch context for the task from GitHub."""
