@@ -8,7 +8,7 @@ import time
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.scanner import Scanner
-from vlooper.worker import Worker
+from vlooper.core.engine import TaskEngine
 
 
 class VLooperDaemon:  # pylint: disable=too-few-public-methods
@@ -17,7 +17,7 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.db = Database()
         self.scanner = Scanner(self.db)
-        self.worker = Worker(self.db)
+        self.engine = TaskEngine(self.db)
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
 
@@ -57,7 +57,7 @@ class VLooperDaemon:  # pylint: disable=too-few-public-methods
                         )
                     else:
                         # 3. Process the next pending task
-                        self.worker.process_next_task()
+                        self.engine.process_next_task()
 
                     # Sleep to avoid hammering everything
                     time.sleep(config.loop_sleep_seconds)

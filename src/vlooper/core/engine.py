@@ -1,4 +1,4 @@
-"""Worker module to execute tasks via OpenCode."""
+"""TaskEngine module to orchestrate task execution."""
 
 from vlooper.agent.loop import AILoop
 from vlooper.config import config
@@ -9,11 +9,11 @@ from vlooper.github import interaction
 from vlooper.processing import error_handler
 
 
-class Worker:  # pylint: disable=too-few-public-methods
-    """Worker to handle task execution and GitHub interactions."""
+class TaskEngine:  # pylint: disable=too-few-public-methods
+    """TaskEngine to handle task execution and GitHub interactions."""
 
     def __init__(self, db: Database):
-        """Initialize the worker with a database instance."""
+        """Initialize the engine with a database instance."""
         self.db = db
         self.ai_loop = AILoop(db, self._post_github_comment)
 
@@ -25,7 +25,7 @@ class Worker:  # pylint: disable=too-few-public-methods
         """Fetch the author of the issue/PR to mention them."""
         return interaction.get_github_author(task)
 
-    def process_next_task(self):
+    def process_next_task(self) -> bool:
         """Process the next pending task from the database."""
         tasks = self.db.get_pending_tasks()
         if not tasks:

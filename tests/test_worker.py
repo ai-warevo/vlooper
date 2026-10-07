@@ -1,5 +1,5 @@
 # pylint: disable=redefined-outer-name,protected-access,unused-argument
-"""Tests for the Worker class."""
+"""Tests for the TaskEngine class."""
 
 import contextlib
 import json
@@ -11,7 +11,7 @@ import pytest
 from vlooper.config import config
 from vlooper.database import Database
 from vlooper.processing import error_handler
-from vlooper.worker import Worker
+from vlooper.core.engine import TaskEngine
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def db(tmp_path):
 @pytest.fixture
 def worker(db):
     """Create a worker instance."""
-    return Worker(db)
+    return TaskEngine(db)
 
 
 def get_all_run_command_patches(side_effect_run):
@@ -74,7 +74,7 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
 
     patches = get_all_run_command_patches(side_effect_run)
     with (
-        patch.object(Worker, "_get_context", return_value="test context"),
+        patch.object(TaskEngine, "_get_context", return_value="test context"),
         contextlib.ExitStack() as stack,
     ):
         for p in patches:
@@ -108,7 +108,7 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
 
     patches = get_all_run_command_patches(side_effect_run)
     with (
-        patch.object(Worker, "_get_context", return_value="test context"),
+        patch.object(TaskEngine, "_get_context", return_value="test context"),
         contextlib.ExitStack() as stack,
     ):
         for p in patches:
@@ -201,7 +201,7 @@ def test_worker_deletes_branch_on_success_and_failure(
 
         patches = get_all_run_command_patches(side_effect_run)
         with (
-            patch.object(Worker, "_get_context", return_value="test context"),
+            patch.object(TaskEngine, "_get_context", return_value="test context"),
             contextlib.ExitStack() as stack,
         ):
             for p in patches:
@@ -251,7 +251,7 @@ def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
 
     patches = get_all_run_command_patches(side_effect_run)
     with (
-        patch.object(Worker, "_get_context", return_value="test context"),
+        patch.object(TaskEngine, "_get_context", return_value="test context"),
         contextlib.ExitStack() as stack,
     ):
         for p in patches:
@@ -293,7 +293,7 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
 
     patches = get_all_run_command_patches(side_effect_run)
     with (
-        patch.object(Worker, "_get_context", return_value="test context"),
+        patch.object(TaskEngine, "_get_context", return_value="test context"),
         contextlib.ExitStack() as stack,
     ):
         for p in patches:
