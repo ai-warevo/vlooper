@@ -414,71 +414,32 @@ class Worker:  # pylint: disable=too-few-public-methods
             )
 
             if attempt > 1:
-                print(f"🔄 Attempt {attempt}/{max_attempts}...")
-                self._post_github_comment(
-                    task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
-                )
+                self._notify_retry_attempt(task, attempt, max_attempts)
 
             # 1. Run Opencode (Agent execution) - Requirement 4: opencode_run_timeout
-            print("🤖 Running Opencode agent...")
-            opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
-            _, err = run_command(
-                opencode_cmd,
-                cwd=repo_dir,
-                timeout=config.opencode_run_timeout,
-                truncate_lines=50,
-            )
+            err = self._execute_opencode_agent(ctx, repo_dir)
 
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
-                snip = self._truncate_output(err, lines=15)
-                post_attempt_status, _ = run_command(
-                    ["git", "status", "--porcelain"], cwd=repo_dir
-                )
-                made_changes = post_attempt_status != pre_attempt_status
-
-                summary = self._get_error_summary(snip)
-                cleaned_snip = self._clean_snippet(snip)
-                is_loop = False
-                for prev_summary, prev_snip in error_summaries:
-                    if (
-                        SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
-                        and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
-                    ):
-                        is_loop = True
-                        break
-
-                if not is_loop:
-                    error_summaries.append((summary, cleaned_snip))
-
-                is_stuck = (
-                    is_loop
-                    or self._is_stuck(snip, last_err_snip)
-                    or (attempt > 1 and not made_changes)
-                )
-                consecutive_errs = consecutive_errs + 1 if is_stuck else 1
-                last_err_snip = snip
-
-                if consecutive_errs >= 2:
-                    print(
-                        "🚨 Agent stuck! Loop detected or same error twice. Breaking loop."
+                is_stuck, consecutive_errs, last_err_snip, ctx = (
+                    self._handle_attempt_failure(
+                        err=err,
+                        task_id=task_id,
+                        attempt=attempt,
+                        pre_attempt_status=pre_attempt_status,
+                        repo_dir=repo_dir,
+                        error_summaries=error_summaries,
+                        last_err_snip=last_err_snip,
+                        consecutive_errs=consecutive_errs,
+                        ctx=ctx,
                     )
-                    self.db.fail_task(task_id, err)
+                )
+                if is_stuck:
                     break
-
-                ctx += "\nThe previous attempt failed with the following errors:"
-                ctx += f"\n{err}\nPlease fix these issues and try again."
-                self.db.fail_task(task_id, err)
                 continue
 
             # 2. Run Tests - Requirement 4: test_run_timeout
-            print(f"🧪 Running tests: {config.test_command}")
-            _, test_err = run_command(
-                shlex.split(config.test_command),
-                cwd=repo_dir,
-                timeout=config.test_run_timeout,
-                truncate_lines=50,
-            )
+            test_err = self._execute_tests(repo_dir)
 
             if test_err is None:
                 print(f"🎉 Tests passed on attempt {attempt}!")
@@ -486,46 +447,108 @@ class Worker:  # pylint: disable=too-few-public-methods
 
             # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
-            snip = self._truncate_output(test_err, lines=15)
-            post_attempt_status, _ = run_command(
-                ["git", "status", "--porcelain"], cwd=repo_dir
-            )
-            made_changes = post_attempt_status != pre_attempt_status
-
-            summary = self._get_error_summary(snip)
-            cleaned_snip = self._clean_snippet(snip)
-            is_loop = False
-            for prev_summary, prev_snip in error_summaries:
-                if (
-                    SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
-                    and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
-                ):
-                    is_loop = True
-                    break
-
-            if not is_loop:
-                error_summaries.append((summary, cleaned_snip))
-
-            is_stuck = (
-                is_loop
-                or self._is_stuck(snip, last_err_snip)
-                or (attempt > 1 and not made_changes)
-            )
-            consecutive_errs = consecutive_errs + 1 if is_stuck else 1
-            last_err_snip = snip
-
-            if consecutive_errs >= 2:
-                print(
-                    "🚨 Agent stuck! Loop detected or same error twice. Breaking loop."
+            is_stuck, consecutive_errs, last_err_snip, ctx = (
+                self._handle_attempt_failure(
+                    err=test_err,
+                    task_id=task_id,
+                    attempt=attempt,
+                    pre_attempt_status=pre_attempt_status,
+                    repo_dir=repo_dir,
+                    error_summaries=error_summaries,
+                    last_err_snip=last_err_snip,
+                    consecutive_errs=consecutive_errs,
+                    ctx=ctx,
                 )
-                self.db.fail_task(task_id, test_err)
+            )
+            if is_stuck:
                 break
 
-            ctx += "\nThe previous attempt failed with the following errors:"
-            ctx += f"\n{test_err}\nPlease fix these issues and try again."
-            self.db.fail_task(task_id, test_err)
-
         return success
+
+    def _notify_retry_attempt(self, task, attempt, max_attempts):
+        """Print and post a comment about the retry status."""
+        print(f"🔄 Attempt {attempt}/{max_attempts}...")
+        self._post_github_comment(
+            task, f"🛠️ Attempt {attempt}/{max_attempts} failed. Retrying..."
+        )
+
+    def _execute_opencode_agent(self, ctx, repo_dir):
+        """Run the Opencode agent command and return any stderr/error content."""
+        print("🤖 Running Opencode agent...")
+        opencode_cmd = ["opencode", "run", "--model", config.model, ctx]
+        _, err = run_command(
+            opencode_cmd,
+            cwd=repo_dir,
+            timeout=config.opencode_run_timeout,
+            truncate_lines=50,
+        )
+        return err
+
+    def _execute_tests(self, repo_dir):
+        """Run the configured test suite command and return any stderr/error content."""
+        print(f"🧪 Running tests: {config.test_command}")
+        _, test_err = run_command(
+            shlex.split(config.test_command),
+            cwd=repo_dir,
+            timeout=config.test_run_timeout,
+            truncate_lines=50,
+        )
+        return test_err
+
+    def _check_error_loop(self, summary, cleaned_snip, error_summaries):
+        """Check if the current error summary and snippet matches past failures closely."""
+        for prev_summary, prev_snip in error_summaries:
+            if (
+                SequenceMatcher(None, summary, prev_summary).ratio() > 0.8
+                and SequenceMatcher(None, cleaned_snip, prev_snip).ratio() > 0.8
+            ):
+                return True
+        return False
+
+    def _handle_attempt_failure(
+        self,
+        err,
+        task_id,
+        attempt,
+        pre_attempt_status,
+        repo_dir,
+        error_summaries,
+        last_err_snip,
+        consecutive_errs,
+        ctx,
+    ):
+        """Process an execution/test error, check if the agent is stuck, and update context."""
+        snip = self._truncate_output(err, lines=15)
+        post_attempt_status, _ = run_command(
+            ["git", "status", "--porcelain"], cwd=repo_dir
+        )
+        made_changes = post_attempt_status != pre_attempt_status
+
+        summary = self._get_error_summary(snip)
+        cleaned_snip = self._clean_snippet(snip)
+
+        is_loop = self._check_error_loop(summary, cleaned_snip, error_summaries)
+        if not is_loop:
+            error_summaries.append((summary, cleaned_snip))
+
+        is_stuck = (
+            is_loop
+            or self._is_stuck(snip, last_err_snip)
+            or (attempt > 1 and not made_changes)
+        )
+        consecutive_errs = consecutive_errs + 1 if is_stuck else 1
+        last_err_snip = snip
+
+        if consecutive_errs >= 2:
+            print("🚨 Agent stuck! Loop detected or same error twice. Breaking loop.")
+            self.db.fail_task(task_id, err)
+            return True, consecutive_errs, last_err_snip, ctx
+
+        ctx += "\nThe previous attempt failed with the following errors:"
+        ctx += f"\n{err}\nPlease fix these issues and try again."
+        self.db.fail_task(task_id, err)
+
+        return False, consecutive_errs, last_err_snip, ctx
 
     def _commit_and_push(self, repo_dir, branch_name, commit_msg):
         print("💾 Committing changes...")
