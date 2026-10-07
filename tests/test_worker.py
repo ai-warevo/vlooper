@@ -189,10 +189,10 @@ def test_worker_deletes_branch_on_success_and_failure(
             delete_cmd in cmd for cmd in called_commands
         ), f"Expected {delete_cmd} to be called, but got {called_commands}"
 
-    # Test Success Case
-    run_test_case(should_succeed=True)
-    # Test Failure Case
-    run_test_case(should_succeed=False)
+        # Test Success Case
+        run_test_case(should_succeed=True)
+        # Test Failure Case
+        run_test_case(should_succeed=False)
 
 
 def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
@@ -276,3 +276,22 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
 
     # With max_retries=0, we expect 1 attempt
     assert opencode_call_count == 1
+
+
+def test_is_stuck(worker):
+    """Test the stuck detection algorithm."""
+    err1 = "Error: File not found at /home/user/project/src/main.py on line 10"
+    err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"  # slightly different path
+    err3 = "Completely different error message"
+
+    # Should be considered stuck (similar)
+    assert worker._is_stuck(err2, err1) is True
+    assert worker._is_stuck(err1, err2) is True
+
+    # Should NOT be considered stuck (different)
+    assert worker._is_stuck(err3, err1) is False
+    assert worker._is_stuck(err1, err3) is False
+
+    # Edge case: None or empty
+    assert worker._is_stuck(err1, None) is False
+    assert worker._is_stuck("", "") is False

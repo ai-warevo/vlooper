@@ -9,6 +9,7 @@ dist/
 wheels/
 *.egg-info
 .coverage
+pylint_output.txt
 
 # Virtual environments
 .venv

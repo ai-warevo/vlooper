@@ -1,7 +1,9 @@
 """Worker module to execute tasks via OpenCode."""
 
 import os
+import re
 import shlex
+from difflib import SequenceMatcher
 
 from vlooper.config import config
 from vlooper.database import Database
@@ -264,15 +266,113 @@ class Worker:  # pylint: disable=too-few-public-methods
             return "\n".join(output_lines[-lines:])
         return output
 
-    def _run_opencode_loop(self, task, task_id, context, repo_dir):
+    def _clean_snippet(self, snippet: str) -> str:
+        """Remove noisy parts like file paths and line numbers from snippets."""
+        # Remove absolute paths (starting with /)
+        snippet = re.sub(r"/[^ \n\t]+", "", snippet)
+        # Remove relative paths and line numbers like "path/to/file.py:123:456" or "path/to/file.py:123"
+        snippet = re.sub(r":\d+(?::\d+)*", "", snippet)
+        # Remove timestamps (e.g., 2023-10-07 12:00:00 or [12:00:00])
+        snippet = re.sub(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", "", snippet)
+        snippet = re.sub(r"\[?\d{2}:\d{2}:\d{2}\]?", "", snippet)
+        # Remove other noise patterns like "(106/100)"
+        snippet = re.sub(r"\(\d+/\d+\)", "", snippet)
+        # Remove common words that might change slightly
+        snippet = re.sub(r"on line \d+", "", snippet)
+        # Normalize whitespace
+        snippet = " ".join(snippet.split())
+        return snippet.strip()
+
+    def _get_error_summary(self, err_text: str) -> str:
+        """Use an LLM to create a concise summary of the error."""
+        if not err_text or len(err_text.strip()) < 5:
+            return err_text
+
+        # Truncate input for the LLM if it's too long
+        truncated_err = self._truncate_output(err_text, lines=20)
+
+        prompt = (
+            "Summarize this error message in a single, concise sentence. "
+            "Focus on the root cause (e.g., 'missing file', 'syntax error in X', 'type error in Y'). "
+            "Do not include paths or line numbers.\n\n"
+            f"{truncated_err}"
+        )
+
+        try:
+            model = config.model.split("/")[-1]  # e.g., 'ollama/gemma' -> 'gemma'
+            cmd = ["ollama", "run", model, prompt]
+            stdout, _err = run_command(cmd, timeout=30)
+            if stdout:
+                return stdout.strip()
+        except Exception as e:
+            print(f"⚠️ Error summarizing error: {e}")
+
+        # Fallback to cleaning the snippet if LLM fails
+        return self._clean_snippet(err_text)
+
+    def _is_stuck(self, new_snip: str, last_err_snip: str) -> bool:
+        """Check if two error snippets are semantically similar."""
+        if last_err_snip is None:
+            return False
+
+        new_snip = self._clean_snippet(new_snip)
+        last_err_snip = self._clean_snippet(last_err_snip)
+
+        if not new_snip or not last_err_snip:
+            return False
+
+        similarity = SequenceMatcher(None, new_snip, last_err_snip).ratio()
+
+        # Case 1: Very similar - definitely stuck
+        if similarity >= 0.8:
+            return True
+
+        # Case 2: Very different - definitely not stuck (yet)
+        if similarity < 0.4:
+            return False
+
+        # Case 3: Ambiguous - use LLM for a second opinion
+        print(f"🤔 Similarity is {similarity:.2f}, using LLM to decide if stuck...")
+        try:
+            prompt = (
+                f"Are these two error messages semantically the same? "
+                f"Answer with only 'YES' or 'NO'.\n\n"
+                f"Error 1: {new_snip}\n"
+                f"Error 2: {last_err_snip}"
+            )
+            # Using ollama directly via shell for simplicity and since we know it exists.
+            model = config.model.split("/")[-1]  # e.g., 'ollama/gemma' -> 'gemma'
+            cmd = ["ollama", "run", model, prompt]
+            stdout, _err = run_command(cmd, timeout=30)
+
+            if stdout:
+                response = stdout.strip().upper()
+                if "YES" in response:
+                    return True
+                elif "NO" in response:
+                    return False
+        except Exception as e:
+            print(
+                f"⚠️ LLM stuck detection failed: {e}. Falling back to similarity score."
+            )
+
+        # Fallback to similarity score if LLM fails or is inconclusive
+        return similarity >= 0.6
+
+    def _run_opencode_loop(self, task, task_id, ctx, repo_dir):
         """Run the agent-driven loop: Write -> Test -> Fix."""
-        ctx = context
         success = False
         last_err_snip = None
         consecutive_errs = 0
         max_attempts = config.max_retries + 1
+        error_summaries = []
 
         for attempt in range(1, max_attempts + 1):
+            # Record the git status at the start of each attempt to track progress.
+            pre_attempt_status, _ = run_command(
+                ["git", "status", "--porcelain"], cwd=repo_dir
+            )
+
             if attempt > 1:
                 print(f"🔄 Attempt {attempt}/{max_attempts}...")
                 self._post_github_comment(
@@ -292,11 +392,31 @@ class Worker:  # pylint: disable=too-few-public-methods
             if err:
                 print(f"⚠️ Opencode error on attempt {attempt}: {err}")
                 snip = self._truncate_output(err, lines=15)
-                consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
+                post_attempt_status, _ = run_command(
+                    ["git", "status", "--porcelain"], cwd=repo_dir
+                )
+                made_changes = post_attempt_status != pre_attempt_status
+
+                summary = self._get_error_summary(snip)
+                is_loop = any(
+                    SequenceMatcher(None, summary, s).ratio() > 0.8
+                    for s in error_summaries
+                )
+                if not is_loop:
+                    error_summaries.append(summary)
+
+                is_stuck = (
+                    is_loop
+                    or self._is_stuck(snip, last_err_snip)
+                    or (attempt > 1 and not made_changes)
+                )
+                consecutive_errs = consecutive_errs + 1 if is_stuck else 1
                 last_err_snip = snip
 
                 if consecutive_errs >= 2:
-                    print("🚨 Agent stuck! Same error twice. Breaking loop.")
+                    print(
+                        "🚨 Agent stuck! Loop detected or same error twice. Breaking loop."
+                    )
                     self.db.fail_task(task_id, err)
                     break
 
@@ -321,11 +441,30 @@ class Worker:  # pylint: disable=too-few-public-methods
             # Step C (Evaluate/Feedback) - Failure logic
             print(f"❌ Tests failed on attempt {attempt}.")
             snip = self._truncate_output(test_err, lines=15)
-            consecutive_errs = consecutive_errs + 1 if snip == last_err_snip else 1
+            post_attempt_status, _ = run_command(
+                ["git", "status", "--porcelain"], cwd=repo_dir
+            )
+            made_changes = post_attempt_status != pre_attempt_status
+
+            summary = self._get_error_summary(snip)
+            is_loop = any(
+                SequenceMatcher(None, summary, s).ratio() > 0.8 for s in error_summaries
+            )
+            if not is_loop:
+                error_summaries.append(summary)
+
+            is_stuck = (
+                is_loop
+                or self._is_stuck(snip, last_err_snip)
+                or (attempt > 1 and not made_changes)
+            )
+            consecutive_errs = consecutive_errs + 1 if is_stuck else 1
             last_err_snip = snip
 
             if consecutive_errs >= 2:
-                print("🚨 Agent stuck! Same error twice. Breaking loop.")
+                print(
+                    "🚨 Agent stuck! Loop detected or same error twice. Breaking loop."
+                )
                 self.db.fail_task(task_id, test_err)
                 break
 
