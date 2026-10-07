@@ -5,7 +5,6 @@ import json
 import os
 import sqlite3
 from unittest.mock import patch
-
 import pytest
 
 from vlooper.config import config
@@ -39,7 +38,6 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "execution_timeout", 5)
 
     def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
-
         cmd_str = " ".join(cmd)
         if "gh repo clone" in cmd_str:
             # target is the last argument
@@ -137,3 +135,61 @@ def test_get_context_issue(worker, db, monkeypatch):
         assert "My Issue" in context
         assert "Description text" in context
         assert "user1" in context
+
+
+def test_worker_deletes_branch_on_success_and_failure(
+    worker, db, monkeypatch, tmp_path
+):
+    """Verify that local branch is deleted after task completion (both success and failure)."""
+    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config, "max_retries", 1)
+
+    def run_test_case(should_succeed):
+        # Reset DB for each case
+        with db._get_connection() as conn:
+            conn.execute("DELETE FROM tasks")
+            conn.commit()
+
+        branch_name = "issue-test-branch"
+        db.add_task("ISSUE", "org/repo1", branch_name)
+
+        called_commands = []
+
+        def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
+            cmd_str = " ".join(cmd)
+            called_commands.append(cmd_str)
+            if "gh repo clone" in cmd_str:
+                target = cmd[-1]
+                base = cwd if cwd else "."
+                target_path = os.path.join(base, target)
+                os.makedirs(target_path, exist_ok=True)
+                return "success", None
+            if any(
+                x in cmd_str for x in ["git checkout", "git pull", "git checkout -B"]
+            ):
+                return "", None
+            if "opencode run" in cmd_str:
+                return ("it worked", None) if should_succeed else (None, "Agent failed")
+            if any(x in cmd_str for x in ["git commit", "git push", "gh pr create"]):
+                return "", None
+            if "git branch -D" in cmd_str:
+                return "", None
+            return "", None
+
+        with (
+            patch("vlooper.worker.run_command", side_effect=side_effect_run),
+            patch("vlooper.github_client.run_command", side_effect=side_effect_run),
+            patch.object(Worker, "_get_context", return_value="test context"),
+        ):
+            worker.process_next_task()
+
+        # Check if git branch -D was called for this branch
+        delete_cmd = f"git branch -D {branch_name}"
+        assert any(
+            delete_cmd in cmd for cmd in called_commands
+        ), f"Expected {delete_cmd} to be called, but got {called_commands}"
+
+    # Test Success Case
+    run_test_case(should_succeed=True)
+    # Test Failure Case
+    run_test_case(should_succeed=False)
