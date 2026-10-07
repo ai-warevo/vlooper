@@ -6,7 +6,7 @@ DIRECTIONS:
    - 'AttemptInfo'
 
 2. Create 'src/vlooper/agent/loop.py'. Extract the "Write -> Test -> Fix" loop logic from 'worker.py' into a new class (or set of functions) in this module. This should include:
-   - '_run_opencode_loop'
+   - 'run_opencode_loop'
    - '_execute_opencode_agent'
    - '_execute_tests'
    - '_notify_retry_attempt'

@@ -50,3 +50,6 @@ target-version = ["py312"]
 disable = [
     "broad-exception-caught",  # Убирает ругань на голый except Exception
 ]
+
+[tool.pylint.design]
+min-public-methods = 1

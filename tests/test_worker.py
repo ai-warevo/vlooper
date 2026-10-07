@@ -1,6 +1,7 @@
 # pylint: disable=redefined-outer-name,protected-access,unused-argument
 """Tests for the Worker class."""
 
+import contextlib
 import json
 import os
 import sqlite3
@@ -9,6 +10,7 @@ import pytest
 
 from vlooper.config import config
 from vlooper.database import Database
+from vlooper.processing import error_handler
 from vlooper.worker import Worker
 
 
@@ -23,6 +25,23 @@ def db(tmp_path):
 def worker(db):
     """Create a worker instance."""
     return Worker(db)
+
+
+def get_all_run_command_patches(side_effect_run):
+    """Helper to provide all necessary run_command patches."""
+    return [
+        patch("vlooper.utils.run_command", side_effect=side_effect_run),
+        patch("vlooper.worker.run_command", side_effect=side_effect_run),
+        patch("vlooper.agent.loop.run_command", side_effect=side_effect_run),
+        patch("vlooper.git.manager.run_command", side_effect=side_effect_run),
+        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
+        patch(
+            "vlooper.github.interaction.run_command", side_effect=side_effect_run
+        ),  # Just in case
+        patch(
+            "vlooper.processing.error_handler.run_command", side_effect=side_effect_run
+        ),
+    ]
 
 
 def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
@@ -54,13 +73,14 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
             return "", None
         return "", None
 
-    with (
-        patch("vlooper.worker.run_command", side_effect=side_effect_run),
-        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
-        patch.object(Worker, "_get_context", return_value="test context"),
-    ):
-        success = worker.process_next_task()
-        assert success is True
+    patches = get_all_run_command_patches(side_effect_run)
+    with patch.object(Worker, "_get_context", return_value="test context"):
+
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            success = worker.process_next_task()
+            assert success is True
 
     # Verify DB status
     with db._get_connection() as conn:
@@ -86,14 +106,14 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
         # Everything else succeeds for the setup part (clone/git)
         return "", None
 
-    with (
-        patch("vlooper.worker.run_command", side_effect=side_effect_run),
-        patch.object(Worker, "_get_context", return_value="test context"),
-    ):
-
-        # The task will fail after all retries
-        success = worker.process_next_task()
-        assert success is False
+    patches = get_all_run_command_patches(side_effect_run)
+    with patch.object(Worker, "_get_context", return_value="test context"):
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            # The task will fail after all retries
+            success = worker.process_next_task()
+            assert success is False
 
     # Verify DB status is FAILED
     with db._get_connection() as conn:
@@ -126,10 +146,12 @@ def test_get_context_issue(worker, db, monkeypatch):
             return mock_comments_json, None
         return "", None
 
-    with (
-        patch("vlooper.worker.run_command", side_effect=mock_run),
-        patch("vlooper.github_client.run_command", side_effect=mock_run),
-    ):
+    patches = get_all_run_command_patches(mock_run)
+    import contextlib
+
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
         context = worker._get_context(task, "org/repo")
         assert context is not None
         assert "My Issue" in context
@@ -176,12 +198,14 @@ def test_worker_deletes_branch_on_success_and_failure(
                 return "", None
             return "", None
 
-        with (
-            patch("vlooper.worker.run_command", side_effect=side_effect_run),
-            patch("vlooper.github_client.run_command", side_effect=side_effect_run),
-            patch.object(Worker, "_get_context", return_value="test context"),
-        ):
-            worker.process_next_task()
+        patches = get_all_run_command_patches(side_effect_run)
+        with patch.object(Worker, "_get_context", return_value="test context"):
+            import contextlib
+
+            with contextlib.ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                worker.process_next_task()
 
         # Check if git branch -D was called for this branch
         delete_cmd = f"git branch -D {branch_name}"
@@ -189,10 +213,8 @@ def test_worker_deletes_branch_on_success_and_failure(
             delete_cmd in cmd for cmd in called_commands
         ), f"Expected {delete_cmd} to be called, but got {called_commands}"
 
-        # Test Success Case
-        run_test_case(should_succeed=True)
-        # Test Failure Case
-        run_test_case(should_succeed=False)
+    run_test_case(should_succeed=True)
+    run_test_case(should_succeed=False)
 
 
 def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
@@ -226,13 +248,15 @@ def test_max_retries_respects_config(worker, db, monkeypatch, tmp_path):
             return "", None
         return "", None
 
-    with (
-        patch("vlooper.worker.run_command", side_effect=side_effect_run),
-        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
-        patch.object(Worker, "_get_context", return_value="test context"),
-    ):
-        success = worker.process_next_task()
-        assert success is False
+    patches = get_all_run_command_patches(side_effect_run)
+    with patch.object(Worker, "_get_context", return_value="test context"):
+        import contextlib
+
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            success = worker.process_next_task()
+            assert success is False
 
     # With max_retries=1, we expect 2 attempts (initial + 1 retry)
     assert opencode_call_count == 2
@@ -266,13 +290,14 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
             return "", None
         return "", None
 
-    with (
-        patch("vlooper.worker.run_command", side_effect=side_effect_run),
-        patch("vlooper.github_client.run_command", side_effect=side_effect_run),
-        patch.object(Worker, "_get_context", return_value="test context"),
-    ):
-        success = worker.process_next_task()
-        assert success is False
+    patches = get_all_run_command_patches(side_effect_run)
+    with patch.object(Worker, "_get_context", return_value="test context"):
+
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            success = worker.process_next_task()
+            assert success is False
 
     # With max_retries=0, we expect 1 attempt
     assert opencode_call_count == 1
@@ -280,18 +305,19 @@ def test_max_retries_different_config(worker, db, monkeypatch, tmp_path):
 
 def test_is_stuck(worker):
     """Test the stuck detection algorithm."""
+
     err1 = "Error: File not found at /home/user/project/src/main.py on line 10"
     err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"
     err3 = "Completely different error message"
 
     # Should be considered stuck (similar)
-    assert worker._is_stuck(err2, err1) is True
-    assert worker._is_stuck(err1, err2) is True
+    assert error_handler.is_stuck(err2, err1) is True
+    assert error_handler.is_stuck(err1, err2) is True
 
     # Should NOT be considered stuck (different)
-    assert worker._is_stuck(err3, err1) is False
-    assert worker._is_stuck(err1, err3) is False
+    assert error_handler.is_stuck(err3, err1) is False
+    assert error_handler.is_stuck(err1, err3) is False
 
     # Edge case: None or empty
-    assert worker._is_stuck(err1, None) is False
-    assert worker._is_stuck("", "") is False
+    assert error_handler.is_stuck(err1, None) is False
+    assert error_handler.is_stuck("", "") is False
