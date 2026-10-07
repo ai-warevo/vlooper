@@ -33,7 +33,7 @@ def get_issue_details(num, repo_full_name):
             comments_list = comments_data["comments"]
             comments_text = "\n".join(
                 [
-                    f"Комментарий от {c['author']['login']}: {c['body']}"
+                    f"Comment by {c['author']['login']}: {c['body']}"
                     for c in comments_list
                 ]
             )
@@ -72,9 +72,9 @@ def get_pr_details(repo_full_name, branch):
         review_text = ""
         for r in pr.get("reviews", []):
             if r.get("body"):
-                review_text += f"Ревью от {r['author']['login']}: {r['body']}\n"
+                review_text += f"Review by {r['author']['login']}: {r['body']}\n"
         for c in pr.get("comments", []):
-            review_text += f"Замечание от {c['author']['login']}: {c['body']}\n"
+            review_text += f"Comment by {c['author']['login']}: {c['body']}\n"
 
         return num, title, body, review_text
     except (json.JSONDecodeError, KeyError):

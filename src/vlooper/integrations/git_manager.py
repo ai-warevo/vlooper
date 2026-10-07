@@ -3,7 +3,7 @@
 import os
 
 from vlooper.config import config
-from vlooper.exceptions import VLooperError
+from vlooper.core.exceptions import VLooperError
 from vlooper.utils import run_command
 
 

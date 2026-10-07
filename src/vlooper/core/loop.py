@@ -4,7 +4,7 @@ import shlex
 
 from vlooper.config import config
 from vlooper.core.models import AttemptInfo, LoopState
-from vlooper.processing import error_handler
+from vlooper.core import error_handler
 from vlooper.utils import run_command
 
 

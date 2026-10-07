@@ -1,8 +1,8 @@
 """Module for interacting with GitHub via CLI (gh)."""
 
 from vlooper.config import config
-from vlooper.exceptions import VLooperError
-from vlooper.github_client import create_pull_request, get_issue_details, get_pr_details
+from vlooper.core.exceptions import VLooperError
+from vlooper.integrations.github_client import create_pull_request, get_issue_details, get_pr_details
 from vlooper.utils import build_gh_view_cmd, run_command
 
 
@@ -36,6 +36,7 @@ def post_github_comment(task, message):
         except Exception as e:  # noqa: W0718
             print(f"⚠️ Error posting GitHub comment: {e}")
     elif task_type == "PR":
+        print("TODO: pr comment logic ...")
         # For PRs, this is handled by different logic or requires more state.
         pass
 
@@ -88,8 +89,8 @@ def get_issue_context(task, repo_full_name):
     title, body, comments_text = details
 
     return (
-        f"Задача #{num} в репозитории {repo_full_name}: {title}\n"
-        f"Описание:\n{body}\n\nИстория переписки:\n{comments_text}"
+        f"ISSUE #{num} on repo {repo_full_name}: {title}\n"
+        f"Description:\n{body}\n\nHistory:\n{comments_text}"
     )
 
 
@@ -102,13 +103,13 @@ def get_pr_context(task, repo_full_name):
 
         num, _, body, review_text = details
 
-        if "Исправлено ботом" in review_text:
+        if "Fixed by bot" in review_text:
             return None
 
         return (
-            f"Доработка по Pull Request #{num} в репозитории "
-            f"{repo_full_name} (ветка {task['branch_name']}).\nЗамечания к коду:\n"
-            f"{review_text}\n\nОписание PR:\n{body}"
+            f"Fix for PR #{num} on repo "
+            f"{repo_full_name} (branch {task['branch_name']}).\nRequested changes:\n"
+            f"{review_text}\n\nPR Description:\n{body}"
         )
     except Exception:  # noqa: W0718
         return None
@@ -122,8 +123,3 @@ def get_issue_number(task):
         except Exception:  # noqa: W0718
             return "unknown"
     return "PR"
-
-
-def get_pr_details_wrapper(repo_full_name, branch_name):
-    """Wrapper for getting PR details."""
-    return get_pr_details(repo_full_name, branch_name)

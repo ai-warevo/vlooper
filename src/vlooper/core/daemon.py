@@ -8,7 +8,7 @@ import time
 from vlooper.config import config
 from vlooper.core.engine import TaskEngine
 from vlooper.database import Database
-from vlooper.scanner import Scanner
+from vlooper.core.scanner import Scanner
 
 
 class VLooperDaemon:  # pylint: disable=too-few-public-methods
