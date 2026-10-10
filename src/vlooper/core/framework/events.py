@@ -4,6 +4,7 @@ class EventName(str, Enum):
     """Centralized registry of all system-wide event names."""
 
     # Task Life Cycle Events
+    TASK_PICKED_UP = "task:picked_up"
     TASK_FINISHED = "task:finished"
 
     # Git/Repository Events

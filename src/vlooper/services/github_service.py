@@ -46,14 +46,23 @@ def post_github_comment(task, message):
     """Helper to post a comment to the respective GitHub issue or PR."""
     repo_full_name = task["repo_full_name"]
     task_type = task["task_type"]
-    branch_name = task["branch_name"]
+    branch_name = task.get("branch_name")
+    issue_num = task.get("issue_number")
 
     if task_type == "ISSUE":
         try:
-            # Extracting number from branch name like 'issue-123'
-            parts = branch_name.split("-")
-            if len(parts) >= 2:
-                num = parts[-1]
+            # Try to get number from branch name if available
+            num = None
+            if branch_name:
+                parts = branch_name.split("-")
+                if len(parts) >= 2:
+                    num = parts[-1]
+            
+            # Fallback to issue_number from task dict
+            if not num and issue_num:
+                num = str(issue_num)
+
+            if num:
                 _, err = post_comment(repo_full_name, num, message)
                 if err:
                     logger.warning(
@@ -61,12 +70,14 @@ def post_github_comment(task, message):
                     )
             else:
                 logger.warning(
-                    "Could not find issue number in branch name: %s", branch_name
+                    "Could not find issue number in branch name or task data: %s (branch: %s)", 
+                    issue_num, branch_name
                 )
         except Exception as e:  # noqa: W0718
             logger.error("Error posting GitHub comment: %s", e)
     elif task_type == "PR":
         logger.debug("TODO: pr comment logic ...")
+
 
 
 def get_github_author(task):
@@ -85,9 +96,15 @@ def get_issue_number(task):
     """Get issue number from task."""
     if task["task_type"] == "ISSUE":
         try:
-            return task["branch_name"].split("-")[-1]
+            # Try branch name first
+            if task.get("branch_name"):
+                return task["branch_name"].split("-")[-1]
+            # Fallback to issue_number field
+            if task.get("issue_number"):
+                return str(task["issue_number"])
         except Exception:  # noqa: W0718
-            return "unknown"
+            pass
+        return "unknown"
     return "PR"
 
 

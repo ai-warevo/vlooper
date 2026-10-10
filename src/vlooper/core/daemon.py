@@ -13,6 +13,7 @@ from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner
 from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
 from vlooper.core.event_handlers.github_notification_handler import GitHubNotificationHandler
+from vlooper.core.event_handlers.github_pickup_handler import GitHubPickupHandler
 from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
 from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
 from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
@@ -57,6 +58,7 @@ class VLooperDaemon:
         # Register post-pipeline task handlers via EventBus
         status_handler = TaskStatusHandler(self.db)
         github_handler = GitHubNotificationHandler()
+        github_pickup_handler = GitHubPickupHandler()
         git_isolated_handler = GitIsolatedHandler()
         test_passed_handler = TestPassedHandler()
         fixing_code_handler = FixingCodeHandler()
@@ -64,6 +66,7 @@ class VLooperDaemon:
 
         self.event_bus.subscribe(EventName.TASK_FINISHED, status_handler.handle)
         self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
+        self.event_bus.subscribe(EventName.TASK_PICKED_UP, github_pickup_handler.handle)
         self.event_bus.subscribe(EventName.GIT_ISOLATED, git_isolated_handler.handle)
         self.event_bus.subscribe(EventName.HARNESS_TEST_PASSED, test_passed_handler.handle)
         self.event_bus.subscribe(EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle)
@@ -153,6 +156,9 @@ class VLooperDaemon:
 
         logger.info("⚙️ Task #%s claimed successfully. Initializing pipeline context...", task["id"])
         ctx = self._map_task_to_context(task)
+
+        # Emit pickup event to notify GitHub that the agent is working on it
+        self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
 
         logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
         self.pipeline.run(ctx)
