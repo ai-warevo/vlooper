@@ -89,7 +89,7 @@ def setup_branch(repo_dir, branch_name, task_type):
 
 
 def commit_and_push(repo_dir, branch_name, commit_msg):
-    """Commits changes and pushes the branch to origin."""
+    """Commits changes and pushes the branch to origin using a rebase strategy."""
     logger.info("💾 Committing changes...")
     logger.debug("Commit message: %s", commit_msg)
     commit_cmd = [
@@ -107,8 +107,18 @@ def commit_and_push(repo_dir, branch_name, commit_msg):
     if err:
         raise VLooperError(err)
 
+    # To avoid non-fast-forward errors, we attempt to rebase our work on top of the remote branch
+    logger.info("🔄 Attempting rebase with origin/%s to synchronize history...", branch_name)
+    rebase_cmd = ["git", "pull", "--rebase", "origin", branch_name]
+    logger.debug("Executing rebase command: %s", " ".join(rebase_cmd))
+    _, err = run_command(rebase_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+    if err:
+        logger.error("❌ Rebase failed. This usually means there are merge conflicts that the AI cannot resolve automatically.")
+        raise VLooperError(f"Rebase failed/conflict detected: {err}")
+
     logger.info("📤 Pushing to origin...")
-    push_cmd = ["git", "push", "origin", branch_name]
+    # Use force-with-lease as a safety measure after rebase
+    push_cmd = ["git", "push", "origin", branch_name, "--force-with-lease"]
     logger.debug("Executing push command: %s", " ".join(push_cmd))
     _, err = run_command(push_cmd, cwd=repo_dir, timeout=config.execution_timeout)
     if err:
