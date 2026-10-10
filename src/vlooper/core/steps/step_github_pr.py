@@ -1,6 +1,6 @@
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
-from vlooper.services.git_service import commit_and_push, quick_reset, delete_branch_workflow
+from vlooper.services.git_service import commit_and_push, quick_reset, cleanup_workspace
 from vlooper.services.github_service import create_pull_request_workflow
 from vlooper.infra.logger import get_logger
 
@@ -66,7 +66,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
             })
 
         # Cleanup after successful PR creation
-        delete_branch_workflow(ctx.workspace_path, ctx.branch_name)
+        cleanup_workspace(ctx.workspace_path, ctx.branch_name)
 
     except Exception as e:
         logger.exception("❌ Failed to complete GitHub Pull Request workflow: %s", e)
