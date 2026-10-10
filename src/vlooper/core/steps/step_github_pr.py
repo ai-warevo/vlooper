@@ -48,9 +48,12 @@ def github_create_pull_request(ctx: TaskContext) -> None:
             body=pr_body,
             cwd=ctx.workspace_path
         )
-
+        
         if err:
             raise Exception(f"GitHub CLI failed to create PR: {err}")
+
+        # Store PR details in context for later use (e.g., commenting)
+        ctx.pr_details = res  # type: ignore
 
         logger.info("🚀 Pull Request created successfully!")
 
