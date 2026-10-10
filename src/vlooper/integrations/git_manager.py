@@ -10,8 +10,8 @@ from vlooper.utils import run_command
 logger = get_logger(__name__)
 
 
-def prepare_repo_dir(repo_full_name, repo_short_name):
-    """Prepare the repo directory by cloning and resetting to default branch."""
+def prepare_repo_dir(repo_full_name, repo_short_name, skip_reset=False):
+    """Prepare the repo directory by cloning and optionally resetting to default branch."""
     base_dir = os.path.expanduser(config.workspace_base_dir)
     logger.debug("Preparing workspace in: %s", base_dir)
     os.makedirs(base_dir, exist_ok=True)
@@ -29,6 +29,10 @@ def prepare_repo_dir(repo_full_name, repo_short_name):
         )
         if err:
             raise VLooperError(err)
+
+    if skip_reset:
+        logger.info("⏩ Skipping destructive reset to main (preserving current workspace state).")
+        return repo_dir
 
     logger.info("🧹 Resetting to default branch...")
     base_branch = "main"

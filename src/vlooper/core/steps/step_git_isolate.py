@@ -55,8 +55,12 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         else:
             branch_name = ctx.branch_name
         
-        # 1. Clone and reset to default branch
-        repo_dir = prepare_repo_dir(full_name, short_name)
+        # Determine if we should skip reset (for retry attempts)
+        attempt_count = ctx.metadata.get("attempt_count", 0)
+        skip_reset = attempt_count > 1
+
+        # 1. Clone and/or prepare directory
+        repo_dir = prepare_repo_dir(full_name, short_name, skip_reset=skip_reset)
         
         # 2. Set up the new feature branch
         setup_branch(repo_dir, branch_name, task_type=task_type)
@@ -76,7 +80,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
                 "workspace": repo_dir
             })
         
-        logger.info("✅ Repository isolated at %s on branch %s", repo_dir, branch_name)
+        logger.info("✅ Repository isolated at %s on branch %s (Attempt: %d)", repo_dir, branch_name, attempt_count)
 
     except Exception as e:
         logger.exception("❌ Failed to isolate repository: %s", e)
