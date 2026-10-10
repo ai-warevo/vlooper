@@ -1,6 +1,8 @@
 import os
 import re
+import sys
 from pathlib import Path
+import argparse
 
 def get_all_py_files(root_dir):
     py_files = []
@@ -36,11 +38,15 @@ def get_definitions(file_path):
     return defs
 
 def analyze():
+    parser = argparse.ArgumentParser(description="Analyze unused Python files and definitions.")
+    parser.add_argument('--exit-on-error', action='store_true', help='Exit with status 1 if unused code is found')
+    args = parser.parse_args()
+
     cwd = Path(".")
     src_root = cwd / "src"
     if not src_root.exists():
         print("Error: src directory not found.")
-        return
+        sys.exit(1)
 
     all_py_files = get_all_py_files(cwd)
     print(f"Found {len(all_py_files)} python files.")
@@ -113,12 +119,15 @@ def analyze():
         if not is_used:
             unused_defs.append(d)
 
+    any_unused = False
+
     print("\n[?] Potential Unused Files:")
     if not unused_files:
         print("None found.")
     else:
         for f in sorted(unused_files):
             print(f"  - {f}")
+        any_unused = True
 
     print("\n[?] Potential Unused Definitions:")
     if not unused_defs:
@@ -127,6 +136,10 @@ def analyze():
         sorted_defs = sorted(unused_defs, key=lambda x: (str(x['file']), x['line']))
         for d in sorted_defs:
             print(f"  - {d['type'].capitalize()} '{d['name']}' in {d['file']} (line {d['line']})")
+        any_unused = True
+
+    if args.exit_on_error and any_unused:
+        sys.exit(1)
 
 if __name__ == "__main__":
     analyze()
