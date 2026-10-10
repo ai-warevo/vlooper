@@ -3,6 +3,7 @@
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.clients.github_client import (
+    clone_repository,
     create_pull_request,
     get_issue_details,
     get_pr_details,
@@ -25,6 +26,18 @@ def create_pull_request_workflow(repo_full_name, title, body, cwd):
     if err:
         return None, err
     return {"html_url": res.strip()}, None
+
+
+def clone_repository_workflow(repo_full_name, repo_short_name, base_dir):
+    """Wrapper for GitHub CLI repository cloning."""
+    success, err = clone_repository(
+        repo_full_name=repo_full_name,
+        repo_short_name=repo_short_name,
+        base_dir=base_dir
+    )
+    if not success:
+        return False, err
+    return True, None
 
 
 def post_github_comment(task, message):

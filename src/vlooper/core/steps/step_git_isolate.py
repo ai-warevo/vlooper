@@ -2,7 +2,7 @@ import os
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
 from vlooper.services.git_service import prepare_repository, setup_working_branch
-from vlooper.clients.github_client import clone_repository
+from vlooper.services.github_service import clone_repository_workflow
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.logger import get_logger
@@ -68,7 +68,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         # 1. Clone and/or prepare directory
         if not os.path.exists(repo_dir):
             logger.info("📥 Cloning repository %s into %s...", full_name, repo_dir)
-            success, err = clone_repository(full_name, short_name, base_dir)
+            success, err = clone_repository_workflow(full_name, short_name, base_dir)
             if not success:
                 raise VLooperError(f"Failed to clone repository: {err}")
         else:
