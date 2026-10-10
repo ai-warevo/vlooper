@@ -40,6 +40,40 @@ def get_definitions(file_path):
     return defs
 
 
+def get_env_vars_from_file(path):
+    env_vars = set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # Typical .env format is KEY=VALUE
+                match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*=", line)
+                if match:
+                    env_vars.add(match.group(1))
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+    return env_vars
+
+
+def get_used_env_vars(file_to_content):
+    used_vars = set()
+    patterns = [
+        re.compile(r"os\.getenv\(\s*['\"]([^'\"]+)['\"]\s*\)"),
+        re.compile(r"os\.environ\.get\(\s*['\"]([^'\"]+)['\"].*?\)"),
+        re.compile(r"os\.environ\[['\"]([^'\"]+)['\"]\]"),
+        re.compile(r"environ\[['\"]([^'\"]+)['\"]\]"),
+        re.compile(r"getenv\(\s*['\"]([^'\"]+)['\"]\s*\)"),
+    ]
+    for content in file_to_content.values():
+        for pattern in patterns:
+            matches = pattern.findall(content)
+            for match in matches:
+                used_vars.add(match)
+    return used_vars
+
+
 def analyze():
     parser = argparse.ArgumentParser(
         description="Analyze unused Python files and definitions."
@@ -48,6 +82,11 @@ def analyze():
         "--exit-on-error",
         action="store_true",
         help="Exit with status 1 if unused code is found",
+    )
+    parser.add_argument(
+        "--check-env-vars",
+        action="store_true",
+        help="Check for unused environment variables from .env files",
     )
     args = parser.parse_args()
 
@@ -148,6 +187,26 @@ def analyze():
                 f"  - {d['type'].capitalize()} '{d['name']}' in {d['file']} (line {d['line']})"
             )
         any_unused = True
+
+    if args.check_env_vars:
+        print("\n[?] Potential Unused Environment Variables:")
+        defined_env_vars = set()
+        # Check .env and .env.example in the current directory
+        for env_file in [cwd / ".env", cwd / ".env.example"]:
+            if env_file.exists():
+                defined_env_vars.update(get_env_vars_from_file(env_file))
+
+        if not defined_env_vars:
+            print("No .env or .env.example file found to analyze.")
+        else:
+            used_env_vars = get_used_env_vars(file_to_content)
+            unused_env_vars = defined_env_vars - used_env_vars
+            if not unused_env_vars:
+                print("None found.")
+            else:
+                for var in sorted(unused_env_vars):
+                    print(f"  - {var}")
+                any_unused = True
 
     if args.exit_on_error and any_unused:
         sys.exit(1)
