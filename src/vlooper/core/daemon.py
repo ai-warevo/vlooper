@@ -85,7 +85,7 @@ class VLooperDaemon:
             # Middleware Layering (Outer to Inner)
             .use(GlobalExceptionHandlerMiddleware())  # Catches unforeseen bugs
             .use(GitHubAuthCheckMiddleware())         # Fails early if tokens missing
-            .use(RetryLimitMiddleware(max_pipeline_attempts=config.max_pipeline_attempts)) # Controls test-fix retries
+            .use(RetryLimitMiddleware(max_pipeline_attempts=config.timeouts.max_pipeline_attempts)) # Controls test-fix retries
 
             # Execution Step Sequencing (Core Work)
             .add_step(git_isolate_repository)        # 1. Setup workspace/branch
@@ -154,8 +154,8 @@ class VLooperDaemon:
                         task = tasks[0]
                     
                     if not task:
-                        logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.loop_sleep_seconds)
-                        time.sleep(config.loop_sleep_seconds)
+                        logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.timeouts.loop_sleep_seconds)
+                        time.sleep(config.timeouts.loop_sleep_seconds)
                         continue
 
                     # 3. Execute the Pipeline for the task
@@ -179,12 +179,12 @@ class VLooperDaemon:
 
                     # Sleep between iterations
                     logger.debug("Iteration complete. Sleeping...")
-                    time.sleep(config.loop_sleep_seconds)
+                    time.sleep(config.timeouts.loop_sleep_seconds)
 
                 except Exception as e:
                     logger.error("⚠️ Unexpected error in daemon loop: %s", e, exc_info=True)
-                    logger.debug("Sleeping for error recovery period (%ss)...", config.error_wait_seconds)
-                    time.sleep(config.error_wait_seconds)
+                    logger.debug("Sleeping for error recovery period (%ss)...", config.timeouts.error_wait_seconds)
+                    time.sleep(config.timeouts.error_wait_seconds)
 
         logger.info("👋 Daemon shut down.")
 

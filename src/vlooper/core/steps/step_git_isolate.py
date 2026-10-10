@@ -62,7 +62,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         skip_reset = attempt_count > 1
 
         # Determine working directory
-        base_dir = os.path.expanduser(config.workspace_base_dir)
+        base_dir = os.path.expanduser(config.infra.workspace_base_dir)
         os.makedirs(base_dir, exist_ok=True)
         repo_dir = os.path.join(base_dir, short_name)
 

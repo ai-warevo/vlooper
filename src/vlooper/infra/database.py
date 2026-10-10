@@ -8,7 +8,7 @@ from vlooper.infra.config import config
 class Database:
     """SQLite database handler for tasks."""
 
-    def __init__(self, db_path=config.db_path):
+    def __init__(self, db_path=config.infra.db_path):
         """Initialize the database with a given path."""
         self.db_path = db_path
         self._init_db()
@@ -100,7 +100,7 @@ class Database:
                 SET status = 'CLAIMED', updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ? AND (status = 'PENDING' OR (status = 'FAILED' AND retries < ?))
             """,
-                (task_id, config.max_task_retries),
+                (task_id, config.timeouts.max_task_retries),
             )
             conn.commit()
             return cursor.rowcount > 0
@@ -124,7 +124,7 @@ class Database:
             # Check retries
             cursor = conn.execute("SELECT retries FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
-            if row and row[0] < config.max_task_retries:
+            if row and row[0] < config.timeouts.max_task_retries:
                 conn.execute(
                     """
                     UPDATE tasks 

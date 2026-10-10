@@ -18,7 +18,7 @@ def checkout(repo_dir, branch, force=False):
         cmd.append("-f")
     cmd.append(branch)
     logger.debug("Executing: %s in %s", " ".join(cmd), repo_dir)
-    _, err = run_command(cmd, cwd=repo_dir, timeout=config.execution_timeout)
+    _, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         raise VLooperError(f"Git checkout failed: {err}")
     return True
@@ -35,7 +35,7 @@ def pull(repo_dir, remote="origin", branch=None, rebase=False):
         cmd.append(branch)
 
     logger.debug("Executing: %s in %s", " ".join(cmd), repo_dir)
-    _, err = run_command(cmd, cwd=repo_dir, timeout=config.execution_timeout)
+    _, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         return False, err
     return True, None
@@ -46,8 +46,8 @@ def commit(repo_dir, commit_msg):
     logger.info("💾 Committing changes...")
     commit_cmd = [
         "git",
-        "-c", f"user.name={config.git_user_name}",
-        "-c", f"user.email={config.git_user_email}",
+        "-c", f"user.name={config.git.git_user_name}",
+        "-c", f"user.email={config.git.git_user_email}",
         "commit",
         "-am",
         commit_msg,
@@ -65,7 +65,7 @@ def push(repo_dir, branch, force_with_lease=True):
         cmd.append("--force-with-lease")
 
     logger.info("📤 Pushing %s to origin...", branch)
-    _, err = run_command(cmd, cwd=repo_dir, timeout=config.execution_timeout)
+    _, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         raise VLooperError(f"Git push failed: {err}")
     return True

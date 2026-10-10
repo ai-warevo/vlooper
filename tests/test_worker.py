@@ -55,9 +55,9 @@ def test_worker_process_next_task_success(worker, db, monkeypatch, tmp_path):
     task_id = tasks[0]["id"]
 
     # Mock config values to use local temp paths
-    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
-    monkeypatch.setattr(config, "max_task_retries", 1)
-    monkeypatch.setattr(config, "execution_timeout", 5)
+    monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 1)
+    monkeypatch.setattr(config.timeouts, "execution_timeout", 5)
 
     def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
         cmd_str = " ".join(cmd)
@@ -100,8 +100,8 @@ def test_worker_process_next_task_failure_and_retry(worker, db, monkeypatch, tmp
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
 
-    monkeypatch.setattr(config, "max_task_retries", 2)
-    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 2)
+    monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
 
     def side_effect_run(cmd, cwd=None, timeout=None, **kwargs):
         cmd_str = " ".join(cmd)
@@ -171,8 +171,8 @@ def test_worker_deletes_branch_on_success_and_failure(
     worker, db, monkeypatch, tmp_path
 ):
     """Verify that local branch is deleted after task completion (both success and failure)."""
-    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
-    monkeypatch.setattr(config, "max_task_retries", 1)
+    monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 1)
 
     def run_test_case(should_succeed):
         # Reset DB for each case
@@ -228,8 +228,8 @@ def test_worker_deletes_branch_on_success_and_failure(
 def test_max_task_retries_respects_config(worker, db, monkeypatch, tmp_path):
     """Verify that the number of attempts follows config.max_task_retries."""
     # Set max_task_retries to 1 (meaning 2 total attempts: 1 initial + 1 retry)
-    monkeypatch.setattr(config, "max_task_retries", 1)
-    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 1)
+    monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
 
     # Add a task
     db.add_task("ISSUE", "org/repo1", "issue-123")
@@ -273,8 +273,8 @@ def test_max_task_retries_respects_config(worker, db, monkeypatch, tmp_path):
 def test_max_task_retries_different_config(worker, db, monkeypatch, tmp_path):
     """Verify that changing config.max_task_retries changes the number of attempts."""
     # Set max_task_retries to 0 (meaning 1 total attempt: just the initial one)
-    monkeypatch.setattr(config, "max_task_retries", 0)
-    monkeypatch.setattr(config, "workspace_base_dir", str(tmp_path / "workspace"))
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 0)
+    monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
 
     db.add_task("ISSUE", "org/repo1", "issue-123")
 

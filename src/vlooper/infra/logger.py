@@ -8,11 +8,11 @@ from vlooper.infra.config import config
 
 def setup_logging():
     """Configures the global logging settings."""
-    log_level = getattr(logging, config.log_level.upper(), logging.INFO)
+    log_level = getattr(logging, config.logs.level.upper(), logging.INFO)
 
     handlers = [logging.StreamHandler(sys.stdout)]
-    if config.log_file:
-        handlers.append(logging.FileHandler(config.log_file))
+    if config.logs.file:
+        handlers.append(logging.FileHandler(config.logs.file))
 
     # Configure the root logger
     logging.basicConfig(

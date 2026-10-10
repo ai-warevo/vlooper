@@ -14,7 +14,7 @@ class RetryLimitMiddleware:
     """
 
     def __init__(self, max_pipeline_attempts: int = None) -> None:
-        self._max_pipeline_attempts = max_pipeline_attempts if max_pipeline_attempts is not None else config.max_pipeline_attempts
+        self._max_pipeline_attempts = max_pipeline_attempts if max_pipeline_attempts is not None else config.timeouts.max_pipeline_attempts
 
     def __call__(self, ctx: TaskContext, next_fn: NextFn) -> None:
         # Retrieve the current attempt count from metadata.

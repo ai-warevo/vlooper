@@ -24,7 +24,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.info("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
 
-        logger.info("🔍 Scanning for new tasks in organization: %s...", config.org_name)
+        logger.info("🔍 Scanning for new tasks in organization: %s...", config.git.org_name)
         self._scan_issues()
         self._scan_prs()
 
@@ -32,7 +32,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
         """Retrieve stale failed tasks from DB and reset them."""
         # cooldown to prevent rapid retry loops for failing tasks.
         failed_tasks = self.db.get_failed_tasks(
-            min_age_seconds=config.failed_task_cooldown_seconds
+            min_age_seconds=config.timeouts.failed_task_cooldown_seconds
         )
         if not failed_tasks:
             logger.debug("No stale failed tasks found to retry.")
@@ -58,10 +58,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
         """Generic scanner for issues and PRs."""
         config_data = self._get_scan_config(is_pr)
 
-        logger.debug("Scanning for %s in organization: %s...", config_data["label"], config.org_name)
+        logger.debug("Scanning for %s in organization: %s...", config_data["label"], config.git.org_name)
         items, err = get_assigned_items(
-            org_name=config.org_name,
-            bot_username=config.bot_username,
+            org_name=config.git.org_name,
+            bot_username=config.git.bot_username,
             is_pr=is_pr
         )
 
