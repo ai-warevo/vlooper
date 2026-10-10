@@ -2,7 +2,7 @@
 
 import os
 
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
 from vlooper.clients.git_client import (

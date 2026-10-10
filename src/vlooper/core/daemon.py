@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Any, Dict, Optional
 
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.persistence.database import Database
 from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner

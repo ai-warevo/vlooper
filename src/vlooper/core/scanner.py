@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 
 import json
 
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.persistence.database import Database
 from vlooper.infra.logger import get_logger
 from vlooper.services.github_service import get_assigned_items, get_github_item

@@ -1,6 +1,6 @@
 from ..framework.context import TaskContext
 from ..framework.events import EventName
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import run_command
 

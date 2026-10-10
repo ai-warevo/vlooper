@@ -4,7 +4,7 @@ from ..framework.types import StepFn
 from ..framework.events import EventName
 from vlooper.services.git_service import prepare_repository, setup_working_branch
 from vlooper.services.github_service import clone_repository_workflow
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
 

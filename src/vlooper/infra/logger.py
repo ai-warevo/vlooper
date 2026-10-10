@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from vlooper.infra.config import config
+from vlooper.config import config
 
 
 def setup_logging():

@@ -1,6 +1,6 @@
 """Database management for vLooper."""
 
-from vlooper.infra.config import config
+from vlooper.config import config
 from vlooper.persistence.db_migrator import DBMigrator
 from vlooper.persistence.migrations import MIGRATIONS
 
