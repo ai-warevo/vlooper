@@ -148,3 +148,11 @@ def add_all(repo_dir):
     if err:
         raise VLooperError(f"Git add -A failed: {err}")
 
+
+def get_diff(repo_dir):
+    """Get the current git diff."""
+    stdout, err = run_command(["git", "diff"], cwd=repo_dir)
+    if err:
+        return None, err
+    return stdout, None
+
