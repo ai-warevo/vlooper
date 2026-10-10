@@ -48,7 +48,8 @@ def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None, 
                 f"Command failed: {' '.join(cmd)}\nSTDOUT:\n{stdout}\n"
                 f"STDERR:\n{stderr}"
             )
-            logger.debug("command failed with error: %s", error_msg)
+            # We use ERROR level because a shell command failing is an actionable event.
+            logger.error("Command failure: %s", error_msg)
             return None, error_msg
         logger.debug("command success, stdout length: %d", len(res.stdout))
         return res.stdout.strip(), None
@@ -68,6 +69,8 @@ def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None, 
             f"Command timed out after {timeout}s: {' '.join(cmd)}\n"
             f"STDOUT:\n{stdout}\nSTDERR:\n{stderr}"
         )
+        logger.error("Command timeout: %s", error_msg)
         return None, error_msg
     except Exception as e:  # noqa: W0718
+        logger.error("Unexpected exception during command execution: %s", e)
         return None, str(e)

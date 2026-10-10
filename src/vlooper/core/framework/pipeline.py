@@ -2,6 +2,10 @@ from typing import List, Callable
 from .context import TaskContext
 from .types import Middleware, StepFn, NextFn
 from .event_bus import EventBus
+from vlooper.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class TaskPipeline:
     """
@@ -69,7 +73,14 @@ class TaskPipeline:
             for step in self._steps:
                 if ctx.is_aborted:
                     break
-                step(ctx)
+                
+                step_name = getattr(step, "__name__", "anonymous_step")
+                logger.info("➡️ [Step] Executing %s...", step_name)
+                try:
+                    step(ctx)
+                except Exception as e:
+                    logger.error("❌ [Step] Error in %s: %s", step_name, e, exc_info=True)
+                    raise e
 
         # The 'current_next' starts pointing to the base executor (the innermost part of the onion).
         current_next: NextFn = base_executor

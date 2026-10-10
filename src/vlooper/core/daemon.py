@@ -134,12 +134,15 @@ class VLooperDaemon:
             while self.running:
                 try:
                     # 1. Scan for new tasks (updates internal DB state/flags)
+                    logger.debug("--- Starting iteration (scanning for tasks) ---")
                     self.scanner.scan(retry_failed=retry_failed)
 
                     # 2. Retrieve the next available task to process
                     if retry_failed:
+                        logger.debug("Mode [Retry]: Querying failed tasks...")
                         tasks = self.db.get_failed_tasks()
                     else:
+                        logger.debug("Mode [Normal]: Querying pending tasks...")
                         tasks = self.db.get_pending_tasks()
 
                     task = None
@@ -147,30 +150,36 @@ class VLooperDaemon:
                         task = tasks[0]
                     
                     if not task:
-                        logger.debug("No tasks found in this iteration. Sleeping...")
+                        logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.loop_sleep_seconds)
                         time.sleep(config.loop_sleep_seconds)
                         continue
 
                     # 3. Execute the Pipeline for the task
-                    logger.info("🎯 Starting execution pipeline for task #%s", task["id"])
+                    logger.info("🎯 Target identified: Task #%s (Type: %s, Repo: %s)", task["id"], task["task_type"], task["repo_full_name"])
                     
                     # Mark as being processed in DB before running to prevent double-claiming
+                    logger.debug("Attempting to claim task #%s...", task["id"])
                     if not self.db.claim_task(task["id"]):
                         logger.debug("Task #%s already claimed or ineligible (max retries reached). Skipping.", task["id"])
                         continue
 
+                    logger.info("⚙️ Task #%s claimed successfully. Initializing pipeline context...", task["id"])
                     ctx = self._map_task_to_context(task)
+                    
+                    logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
                     self.pipeline.run(ctx)
 
                     # 4. Sync final results back to Database
+                    logger.info("🔄 Pipeline finished for task #%s. Synchronizing results with DB...", ctx.task_id)
                     self._update_task_status(ctx)
 
                     # Sleep between iterations
+                    logger.debug("Iteration complete. Sleeping...")
                     time.sleep(config.loop_sleep_seconds)
 
                 except Exception as e:
-                    logger.error("⚠️ Unexpected error in daemon loop: %s", e)
-                    logger.debug("Sleeping for error recovery period...")
+                    logger.error("⚠️ Unexpected error in daemon loop: %s", e, exc_info=True)
+                    logger.debug("Sleeping for error recovery period (%ss)...", config.error_wait_seconds)
                     time.sleep(config.error_wait_seconds)
 
         logger.info("👋 Daemon shut down.")
