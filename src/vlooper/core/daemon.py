@@ -10,13 +10,14 @@ from vlooper.infra.config import config
 from vlooper.infra.database import Database
 from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner
+from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
+from vlooper.core.event_handlers.github_notification_handler import GitHubNotificationHandler
+from vlooper.core.framework.events import EventName
 
 # Framework imports
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.event_bus import EventBus
 from vlooper.core.framework.pipeline import TaskPipeline
-
-# Step and Middleware imports
 from vlooper.core.middleware.middleware_error_handler import GlobalExceptionHandlerMiddleware
 from vlooper.core.middleware.middleware_github_auth import GitHubAuthCheckMiddleware
 from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
@@ -24,7 +25,6 @@ from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_run_tests import run_repository_tests
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
 from vlooper.core.steps.step_github_pr import github_create_pull_request
-from vlooper.services.github_service import post_github_comment, get_github_author
 
 logger = get_logger(__name__)
 
@@ -48,6 +48,13 @@ class VLooperDaemon:
         self.event_bus = EventBus()
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
+
+        # Register post-pipeline task handlers via EventBus
+        status_handler = TaskStatusHandler(self.db)
+        github_handler = GitHubNotificationHandler()
+        
+        self.event_bus.subscribe(EventName.TASK_FINISHED, status_handler.handle)
+        self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
 
         # Core Pipeline Bootstrap
         self.pipeline = self._bootstrap_pipeline()
@@ -91,62 +98,6 @@ class VLooperDaemon:
                 "original_task": task         # Preserve original record if needed
             }
         )
-
-    def _update_task_status(self, ctx: TaskContext) -> None:
-        """
-        Updates the database with final results from the pipeline execution.
-        Determines status based on context flags and exit codes.
-        """
-        try:
-            if ctx.is_aborted or (ctx.exit_code is not None and ctx.exit_code != 0):
-                error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
-                logger.info("📝 Finalizing task #%s as FAILED: %s", ctx.task_id, error_msg)
-                self.db.fail_task(ctx.task_id, error_msg)
-            else:
-                logger.info("📝 Finalizing task #%s as COMPLETED.", ctx.task_id)
-                self.db.complete_task(ctx.task_id)
-        except Exception as e:
-            logger.error("❌ Failed to update database for task #%s: %s", ctx.task_id, e)
-
-    def _post_completion_comment(self, ctx: TaskContext) -> None:
-        """Posts a summary comment to the GitHub issue/PR after pipeline completion."""
-        # Construct task data for the legacy helper function
-        task_data = {
-            "repo_full_name": ctx.metadata.get("repo_full_name"),
-            "task_type": ctx.metadata["original_task"]["task_type"],
-            "branch_name": ctx.branch_name,
-        }
-
-        # Ensure we have the necessary info to identify the issue/PR
-        if not task_data["repo_full_name"] or not task_data["branch_name"]:
-            logger.warning("⚠️ Cannot post GitHub comment: missing repo_full_name or branch_name in context.")
-            return
-
-        try:
-            # Fetch author to mention them
-            author = get_github_author(task_data)
-            mention = f"@{author} " if author and author != "assignee" else ""
-
-            if ctx.exit_code == 0:
-                # Successful completion
-                message = f"{mention}✅ **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
-                if hasattr(ctx, 'pr_details') and ctx.pr_details:
-                     url = ctx.pr_details.get('html_url', '')
-                     if url:
-                         message += f"\n\n🔗 **Pull Request:** {url}"
-                
-                logger.info("💬 Posting success comment to GitHub...")
-                post_github_comment(task_data, message)
-            else:
-                # Failure (either aborted or exit code != 0)
-                error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
-                message = f"{mention}❌ **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
-                
-                logger.info("💬 Posting failure comment to GitHub...")
-                post_github_comment(task_data, message)
-
-        except Exception as e:
-            logger.error("❌ Failed to post completion comment to GitHub: %s", e)
 
     def run(self, retry_failed: bool = False) -> None:
         """
@@ -210,12 +161,9 @@ class VLooperDaemon:
                     logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
                     self.pipeline.run(ctx)
 
-                    # 4. Sync final results back to Database
-                    logger.info("🔄 Pipeline finished for task #%s. Synchronizing results with DB...", ctx.task_id)
-                    self._update_task_status(ctx)
-
-                    # Post completion comment to GitHub
-                    self._post_completion_comment(ctx)
+                    # 4. Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
+                    logger.info("🔔 Emitting '%s' event for Task #%s...", EventName.TASK_FINISHED, ctx.task_id)
+                    self.event_bus.emit(EventName.TASK_FINISHED, ctx)
 
                     # Sleep between iterations
                     logger.debug("Iteration complete. Sleeping...")

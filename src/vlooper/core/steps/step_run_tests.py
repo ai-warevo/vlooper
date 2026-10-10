@@ -1,5 +1,6 @@
 import subprocess
 from ..framework.context import TaskContext
+from ..framework.events import EventName
 from vlooper.infra.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +36,7 @@ def run_repository_tests(ctx: TaskContext) -> None:
             # Retrieve EventBus from context metadata to emit event
             event_bus = ctx.metadata.get("event_bus")
             if event_bus:
-                event_bus.emit("harness:test_passed", {"task_id": ctx.task_id})
+                event_bus.emit(EventName.HARNESS_TEST_PASSED, {"task_id": ctx.task_id})
         else:
             logger.warning("❌ Tests failed with exit code %d.", ctx.exit_code)
             logger.error("--- TEST FAILURE DETAILS ---\n%s\n-----------------------------", ctx.error_logs)

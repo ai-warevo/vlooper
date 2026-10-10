@@ -1,4 +1,5 @@
 from ..framework.context import TaskContext
+from ..framework.events import EventName
 from vlooper.infra.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import run_command
@@ -24,7 +25,7 @@ def apply_ai_fix(ctx: TaskContext) -> None:
     # Emit event before invocation
     event_bus = ctx.metadata.get("event_bus")
     if event_bus:
-        event_bus.emit("harness:fixing_code", {"task_id": ctx.task_id})
+        event_bus.emit(EventName.HARNESS_FIXING_CODE, {"task_id": ctx.task_id})
 
     if not ctx.error_logs:
         logger.warning("⚠️ Tests failed but no error logs were found in context.")

@@ -1,5 +1,6 @@
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
+from ..framework.events import EventName
 from vlooper.services.git_service import commit_and_push, quick_reset, cleanup_workspace
 from vlooper.services.github_service import create_pull_request_workflow
 from vlooper.infra.logger import get_logger
@@ -58,13 +59,13 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         # 3. Emit success event
         event_bus = ctx.metadata.get("event_bus")
         if event_bus:
-            event_bus.emit("github:pr_created", {
+            event_bus.emit(EventName.GITHUB_PR_CREATED, {
                 "task_id": ctx.task_id,
                 "repo": repo_full_name,
                 "branch": ctx.branch_name,
                 "details": ctx.pr_details
             })
-
+        
         # Cleanup after successful PR creation
         cleanup_workspace(ctx.workspace_path, ctx.branch_name)
 
