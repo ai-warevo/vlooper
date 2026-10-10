@@ -124,6 +124,6 @@ def test_get_active_claimed_task(db):
 
 def test_task_exists(db):
     """Test existence check for tasks."""
-    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "issue-1")
     assert db.task_exists("org/repo1", "issue-1") is True
     assert db.task_exists("org/repo1", "non-existent") is False
