@@ -17,9 +17,9 @@ from vlooper.core.framework.event_bus import EventBus
 from vlooper.core.framework.pipeline import TaskPipeline
 
 # Step and Middleware imports
-from vlooper.core.steps.middleware_error_handler import GlobalExceptionHandlerMiddleware
-from vlooper.core.steps.middleware_github_auth import GitHubAuthCheckMiddleware
-from vlooper.core.steps.middleware_retry_limit import RetryLimitMiddleware
+from vlooper.core.middleware.middleware_error_handler import GlobalExceptionHandlerMiddleware
+from vlooper.core.middleware.middleware_github_auth import GitHubAuthCheckMiddleware
+from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
 from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_run_tests import run_repository_tests
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
