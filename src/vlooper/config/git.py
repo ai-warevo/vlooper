@@ -20,3 +20,8 @@ class GitConfig:
     gh_token: Optional[str] = field(
         default_factory=lambda: os.environ.get("GH_TOKEN", None)
     )
+    authorized_users: list[str] = field(
+        default_factory=lambda: [
+            u.strip() for u in os.environ.get("AUTHORIZED_USERS", "").split(",") if u.strip()
+        ]
+    )

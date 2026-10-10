@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from vlooper.database import Database
+from vlooper.persistence.database import Database
 from vlooper.core.scanner import Scanner
 
 

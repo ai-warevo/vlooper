@@ -9,7 +9,7 @@ def clone_repository(repo_full_name, repo_short_name, base_dir):
     """Clone a repository using GitHub CLI."""
     print(f"Cloning repository {repo_full_name}...")
     cmd = ["gh", "repo", "clone", repo_full_name, repo_short_name]
-    res, err = run_command(cmd, cwd=base_dir)
+    _res, err = run_command(cmd, cwd=base_dir)
     if err:
         return False, err
     return True, None
@@ -132,7 +132,7 @@ def get_issue_author(repo_full_name, num):
     return res.strip()
 
 
-def search_issues(org_name, bot_username, is_pr=False, fields="number,title,body,repository,isPullRequest"):
+def search_issues(org_name, bot_username, is_pr=False, fields="number,title,body,repository,isPullRequest,author"):
     """Search for issues or PRs in an organization assigned to a user."""
     filter_type = "is:pr" if is_pr else "is:issue"
     cmd = [
