@@ -1,0 +1,22 @@
+from dataclasses import dataclass, field
+import os
+from typing import Optional
+
+@dataclass
+class GitConfig:
+    """Git related configuration."""
+    org_name: str = field(
+        default_factory=lambda: os.environ.get("ORG_NAME", "ai-warevo")
+    )
+    bot_username: str = field(
+        default_factory=lambda: os.environ.get("BOT_USERNAME", "your_bot_login")
+    )
+    git_user_name: str = field(
+        default_factory=lambda: os.environ.get("GIT_USER_NAME", "AI OpenCode Bot")
+    )
+    git_user_email: str = field(
+        default_factory=lambda: os.environ.get("GIT_USER_EMAIL", "ai-bot@://github.com")
+    )
+    gh_token: Optional[str] = field(
+        default_factory=lambda: os.environ.get("GH_TOKEN", None)
+    )
