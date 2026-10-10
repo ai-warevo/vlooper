@@ -2,7 +2,7 @@
 
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.integrations.github_client import (
+from vlooper.clients.github_client import (
     create_pull_request,
     get_issue_details,
     get_pr_details,

@@ -5,6 +5,16 @@ import json
 from vlooper.utils import run_command
 
 
+def clone_repository(repo_full_name, repo_short_name, base_dir):
+    """Clone a repository using GitHub CLI."""
+    print(f"📦 Cloning repository {repo_full_name}...")
+    cmd = ["gh", "repo", "clone", repo_full_name, repo_short_name]
+    res, err = run_command(cmd, cwd=base_dir)
+    if err:
+        return False, err
+    return True, None
+
+
 def get_issue_info(num, repo_full_name, fields="title,body"):
     """Fetch issue information with specified JSON fields via GitHub CLI."""
     cmd = ["gh", "issue", "view", str(num), "--repo", repo_full_name, "--json", fields]

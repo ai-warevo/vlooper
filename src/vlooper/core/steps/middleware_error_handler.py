@@ -20,5 +20,5 @@ class GlobalExceptionHandlerMiddleware:
             ctx.is_aborted = True
             ctx.error = e
             if ctx.workspace_path and ctx.branch_name:
-                from vlooper.integrations.git_manager import stash_and_checkout_main
-                stash_and_checkout_main(ctx.workspace_path)
+                from vlooper.services.git_service import quick_reset
+                quick_reset(ctx.workspace_path)

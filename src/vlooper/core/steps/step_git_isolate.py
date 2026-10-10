@@ -1,7 +1,7 @@
 import os
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
-from vlooper.integrations.git_manager import prepare_repo_dir, setup_branch
+from vlooper.services.git_service import prepare_repository, setup_working_branch
 from vlooper.core.exceptions import VLooperError
 from vlooper.logger import get_logger
 
@@ -60,10 +60,10 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         skip_reset = attempt_count > 1
 
         # 1. Clone and/or prepare directory
-        repo_dir = prepare_repo_dir(full_name, short_name, skip_reset=skip_reset)
+        repo_dir = prepare_repository(full_name, short_name, skip_reset=skip_reset)
         
         # 2. Set up the new feature branch
-        setup_branch(repo_dir, branch_name, task_type=task_type)
+        setup_working_branch(repo_dir, branch_name, task_type=task_type)
         
         # Update context
         ctx.workspace_path = repo_dir

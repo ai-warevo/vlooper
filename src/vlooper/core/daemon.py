@@ -24,7 +24,7 @@ from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_run_tests import run_repository_tests
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
 from vlooper.core.steps.step_github_pr import github_create_pull_request
-from vlooper.integrations.github_interaction import post_github_comment
+from vlooper.services.github_service import post_github_comment
 
 logger = get_logger(__name__)
 
