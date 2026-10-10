@@ -34,18 +34,17 @@ def get_issue_info(num, repo_full_name, fields="title,body"):
 
 def get_issue_details(num, repo_full_name):
     """Fetch issue details including title, body and comments."""
-    data = get_issue_info(num, repo_full_name, "title,body")
+    data = get_issue_info(num, repo_full_name, "title,body,comments")
     if not data:
         return None
 
     title = data.get("title")
     body = data.get("body") or ""
 
-    comments_data = get_issue_info(num, repo_full_name, "comments")
     comments_text = ""
-    if comments_data and "comments" in comments_data:
+    comments_list = data.get("comments")
+    if isinstance(comments_list, list):
         try:
-            comments_list = comments_data["comments"]
             comments_text = "\n".join(
                 [
                     f"Comment by {c['author']['login']}: {c['body']}"
