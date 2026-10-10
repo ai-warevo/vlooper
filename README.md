@@ -77,7 +77,8 @@ Use these commands to maintain code quality and run tests during development:
 
 | Command | Description |
 | :--- | :--- |
-| `uv run check` | Run linters, type checkers, and formatters |
+| `uv run check` | Run linters (ruff) and formatters (black) |
+| `uv run analyze` | Identify unused files and definitions |
 | `uv run pytest` | Execute the test suite |
 | `uv sync` | Synchronize local environment with `pyproject.toml` |
 
