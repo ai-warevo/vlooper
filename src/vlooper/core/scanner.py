@@ -9,7 +9,7 @@ from vlooper.infra.utils import build_gh_view_cmd, run_command
 
 logger = get_logger(__name__)
 
-
+# TODO: ghclient + ghservice
 class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
 
