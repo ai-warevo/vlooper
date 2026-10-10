@@ -40,17 +40,26 @@ def git_isolate_repository(ctx: TaskContext) -> None:
     Clones the target repository locally and sets up a dedicated workspace branch.
     Prepares the context with 'workspace_path' and 'branch_name'.
     """
-    logger.info("🚀 Isolating repository for issue #%s...", ctx.issue_number)
+    # Identify task type from original record
+    task_type = ctx.metadata["original_task"]["task_type"]
+    logger.info("🚀 Isolating repository for %s #%s...", task_type.lower(), ctx.issue_number)
 
     try:
         full_name, short_name = _parse_repo_info(ctx.repo_url)
-        branch_name = f"vlooper/fix-{ctx.issue_number}"
+        
+        # Determine branch name: 
+        # Issues get a new standardized fix branch.
+        # PRs use the existing head branch captured by the scanner.
+        if task_type == "ISSUE":
+            branch_name = f"vlooper/fix-{ctx.issue_number}"
+        else:
+            branch_name = ctx.branch_name
         
         # 1. Clone and reset to default branch
         repo_dir = prepare_repo_dir(full_name, short_name)
         
         # 2. Set up the new feature branch
-        setup_branch(repo_dir, branch_name, task_type="PR")
+        setup_branch(repo_dir, branch_name, task_type=task_type)
         
         # Update context
         ctx.workspace_path = repo_dir
