@@ -45,7 +45,7 @@ export GH_TOKEN=your_bot_token_here
 To start the core engine that scans and processes tasks:
 
 ```sh
-vlooper
+uv run vlooper
 ```
 
 *Alternatively, run from source:* `python -m vlooper`
@@ -58,14 +58,14 @@ vlooper
 Instead of scanning GitHub for new tasks, specifically targets failed tasks in the local database. Useful after you've patched a bug that caused previous failures!
 
 ```sh
-vlooper-retry
+uv run vlooper-retry
 ```
 
 **Monitoring (TUI Dashboard)**  
 To see what the agent is doing in real-time with a beautiful terminal interface, **open a second terminal** and run:
 
 ```sh
-vlooper-tui
+uv run vlooper-tui
 ```
 *Note: The TUI is only a viewer. You must have the daemon running in a separate window to see any activity.*
 

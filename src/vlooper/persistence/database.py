@@ -1,5 +1,7 @@
 """Database management for vLooper."""
 
+import sqlite3
+
 from vlooper.config import config
 from vlooper.persistence.db_migrator import DBMigrator
 from vlooper.persistence.migrations import MIGRATIONS
