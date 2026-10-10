@@ -29,6 +29,9 @@ class Config:  # pylint: disable=too-many-instance-attributes
     max_retries: int = field(
         default_factory=lambda: int(os.environ.get("MAX_RETRIES", "2"))
     )
+    max_attempts: int = field(
+        default_factory=lambda: int(os.environ.get("MAX_ATTEMPTS", "5"))
+    )
     execution_timeout: int = field(
         default_factory=lambda: int(os.environ.get("EXECUTION_TIMEOUT", "300"))
     )

@@ -1,6 +1,7 @@
 from ..framework.types import Middleware, NextFn
 from ..framework.context import TaskContext
 from vlooper.logger import get_logger
+from vlooper.config import config
 
 logger = get_logger(__name__)
 
@@ -12,8 +13,8 @@ class RetryLimitMiddleware:
     succeeded (exit_code != 0), it aborts the entire pipeline.
     """
 
-    def __init__(self, max_attempts: int = 5) -> None:
-        self._max_attempts = max_attempts
+    def __init__(self, max_attempts: int = None) -> None:
+        self._max_attempts = max_attempts if max_attempts is not None else config.max_attempts
 
     def __call__(self, ctx: TaskContext, next_fn: NextFn) -> None:
         # Retrieve the current attempt count from metadata.
