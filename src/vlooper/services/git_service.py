@@ -62,13 +62,13 @@ def setup_working_branch(repo_dir, branch_name, task_type):
     return True
 
 
-def commit_and_push(repo_dir, branch_name, commit_msg):
+def commit_and_push(repo_dir, branch_name, commit_msg, user_name: str = None, user_email: str = None):
     """Orchestrates committing changes and pushing with a rebase strategy."""
     # 1. Commit
     if has_uncommitted_changes(repo_dir):
         logger.info("Finalizing changes...")
         add_all(repo_dir)
-        commit(repo_dir, commit_msg)
+        commit(repo_dir, commit_msg, user_name=user_name, user_email=user_email)
     else:
         logger.info("No uncommitted changes found. Skipping redundant commit.")
 

@@ -36,10 +36,13 @@ def apply_ai_fix(ctx: TaskContext) -> None:
     client = OpencodeClient()
     logger.debug("Executing Agent Command via client for task #%s", ctx.task_id)
 
-    # Construct a clean prompt for the agent with issue context if available
+    # Construct a clean prompt for the agent with issue context if available and STRICT instructions
     prompt_parts = [
         f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repository {ctx.repo_full_name or ctx.repo_url} "
-        f"on branch '{ctx.branch_name or 'unknown'}'."
+        f"on branch '{ctx.branch_name or 'unknown'}'.",
+        "\nIMPORTANT: DO NOT use 'git commit', 'git push', or any other git commands to save your work.",
+        "Only modify the necessary files to fix the issue.",
+        "The system will handle committing and pushing your changes automatically."
     ]
 
     if ctx.issue_title:

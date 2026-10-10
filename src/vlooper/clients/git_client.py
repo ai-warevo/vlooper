@@ -53,13 +53,18 @@ def pull(repo_dir, remote="origin", branch=None, rebase=False):
     return True, None
 
 
-def commit(repo_dir, commit_msg):
-    """Commit changes with configured user info."""
+def commit(repo_dir, commit_msg, user_name: str = None, user_email: str = None):
+    """Commit changes. Uses configured user info by default, or overrides if provided."""
     logger.info("Committing changes...")
+    
+    # Determine which identity to use (fallback to config if not explicitly provided)
+    final_user_name = user_name or config.git.git_user_name
+    final_user_email = user_email or config.git.git_user_email
+
     commit_cmd = [
         "git",
-        "-c", f"user.name={config.git.git_user_name}",
-        "-c", f"user.email={config.git.git_user_email}",
+        "-c", f"user.name={final_user_name}",
+        "-c", f"user.email={final_user_email}",
         "commit",
         "-am",
         commit_msg,
