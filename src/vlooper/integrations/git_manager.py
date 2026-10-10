@@ -145,25 +145,24 @@ def commit_and_push(repo_dir, branch_name, commit_msg):
     return True
 
 
+def checkout_default_branch(repo_dir):
+    """Attempts to check out one of the default branches (main or master)."""
+    for b in ["main", "master"]:
+        logger.debug("Attempting to checkout %s...", b)
+        _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir, timeout=config.execution_timeout)
+        if not err:
+            return b
+    raise VLooperError("Could not find or checkout a default branch (main/master).")
+
+
 def stash_and_checkout_main(repo_dir):
     """Stash changes and checkout default branch if a push or PR creation fails."""
     logger.info("🧹 Stashing changes and checking out default branch...")
     run_command(["git", "stash"], cwd=repo_dir)
-    base_branch = "main"
-    for b in ["main", "master"]:
-        _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
-        if not err:
-            base_branch = b
-            break
-
-    logger.debug("Checking out %s after stash...", base_branch)
-    _, err = run_command(
-        ["git", "checkout", "-f", base_branch],
-        cwd=repo_dir,
-        timeout=config.execution_timeout,
-    )
-    if err:
-        logger.warning("⚠️ Failed to checkout default branch during cleanup: %s", err)
+    try:
+        checkout_default_branch(repo_dir)
+    except VLooperError as e:
+        logger.warning("⚠️ Failed to checkout default branch during cleanup: %s", e)
 
 
 def delete_local_branch(repo_dir, branch_name):
@@ -177,21 +176,13 @@ def delete_local_branch(repo_dir, branch_name):
     run_command(["git", "clean", "-fd"], cwd=repo_dir)
 
     # 2. Switch back to a default branch (main or master).
-    switched = False
-    for b in ["main", "master"]:
-        logger.debug("Attempting to switch back to %s before deleting branch...", b)
-        _, err = run_command(["git", "checkout", "-f", b], cwd=repo_dir)
-        if not err:
-            switched = True
-            break
-
-    if not switched:
-        logger.warning(
-            "⚠️ Could not checkout main/master, attempting to detach HEAD..."
-        )
+    try:
+        checkout_default_branch(repo_dir)
+    except VLooperError:
+        logger.warning("⚠️ Could not checkout main/master, attempting to detach HEAD...")
         _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
-        if not err:
-            switched = True
+        if err:
+            logger.error("❌ Failed to detach HEAD: %s", err)
 
     # 3. Delete the branch.
     logger.debug("Deleting local branch %s via git branch -D", branch_name)
