@@ -34,8 +34,6 @@ def get_issue_info(num, repo_full_name, fields="title,body"):
 
 def get_issue_details(num, repo_full_name):
     """Fetch issue details including title, body and comments."""
-...
-    """Fetch issue details including title, body and comments."""
     data = get_issue_info(num, repo_full_name, "title,body")
     if not data:
         return None
