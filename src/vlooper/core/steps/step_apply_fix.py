@@ -1,15 +1,16 @@
-from ..framework.context import TaskContext
-from ..framework.events import EventName
+from vlooper.clients.opencode_client import OpencodeClient
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
-from vlooper.infra.utils import run_command
-from vlooper.clients.opencode_client import OpencodeClient
+
+from ..framework.context import TaskContext
+from ..framework.events import EventName
 
 logger = get_logger(__name__)
 
+
 def apply_ai_fix(ctx: TaskContext) -> None:
     """
-    Triggers an automatic code fix using the Opencode agent based on error logs 
+    Triggers an automatic code fix using the Opencode agent based on error logs
     provided in the context. This step only executes if tests have failed.
     """
     if ctx.exit_code == 0:
@@ -38,11 +39,13 @@ def apply_ai_fix(ctx: TaskContext) -> None:
 
     # Construct a clean prompt for the agent with issue context if available and STRICT instructions
     prompt_parts = [
-        f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repository {ctx.repo_full_name or ctx.repo_url} "
-        f"on branch '{ctx.branch_name or 'unknown'}'.",
+        (
+            f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repository {ctx.repo_full_name or ctx.repo_url} "
+            f"on branch '{ctx.branch_name or 'unknown'}'."
+        ),
         "\nIMPORTANT: DO NOT use 'git commit', 'git push', or any other git commands to save your work.",
         "Only modify the necessary files to fix the issue.",
-        "The system will handle committing and pushing your changes automatically."
+        "The system will handle committing and pushing your changes automatically.",
     ]
 
     if ctx.issue_title:
@@ -65,15 +68,15 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         )
 
         if err:
-            # We don't necessarily want to abort the whole pipeline if the agent fails once, 
+            # We don't necessarily want to abort the whole pipeline if the agent fails once,
             # as the retry middleware might handle it. However, we log it clearly.
             logger.error("Opencode agent failed to apply fix: %s", err)
             # If the agent itself crashes or cannot run, it's a hard failure for this attempt.
         else:
             logger.info("AI agent has successfully completed the execution.")
-            # Note: We do NOT change ctx.exit_code here. 
+            # Note: We do NOT change ctx.exit_code here.
             # The next step/retry loop will RUN TESTS AGAIN to verify if the fix worked.
 
-    except Exception as e:
-        logger.exception("Critical error while running Opencode agent: %s", e)
-        raise e
+    except Exception:
+        logger.exception("Critical error while running Opencode agent")
+        raise

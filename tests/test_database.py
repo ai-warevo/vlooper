@@ -4,7 +4,7 @@
 import pytest
 
 from vlooper.config import config
-from vlooper.database import Database
+from vlooper import Database
 
 
 @pytest.fixture
@@ -28,17 +28,17 @@ def test_db_init(db):
 def test_add_task(db):
     """Test adding new tasks."""
     # Test adding new tasks
-    assert db.add_task("ISSUE", "org/repo1", "issue-123") is True
-    assert db.add_task("PR", "org/repo1", "feature-branch") is True
+    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main") is True
+    assert db.add_task("PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch") is True
     # Test duplicate prevention
-    assert db.add_task("ISSUE", "org/repo1", "issue-123") is False
+    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main") is False
 
 
 def test_get_pending_tasks(db):
     """Test getting pending tasks."""
-    db.add_task("ISSUE", "org/repo1", "issue-1")
-    db.add_task("PR", "org/repo2", "branch-2")
-    db.add_task("ISSUE", "org/repo3", "issue-3")  # This will be PENDING
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
+    db.add_task("PR", "org/repo2", "https://github.com/org/repo2", 2, "branch-2")
+    db.add_task("ISSUE", "org/repo3", "https://github.com/org/repo3", 3, "main")  # This will be PENDING
 
     pending = db.get_pending_tasks()
     assert len(pending) == 3
@@ -47,7 +47,7 @@ def test_get_pending_tasks(db):
 
 def test_claim_task(db):
     """Test claiming a task."""
-    db.add_task("ISSUE", "org/repo1", "issue-1")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
 
@@ -65,7 +65,7 @@ def test_claim_task(db):
 
 def test_complete_task(db):
     """Test completing a task."""
-    db.add_task("ISSUE", "org/repo1", "issue-1")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
     db.claim_task(task_id)
@@ -79,9 +79,9 @@ def test_complete_task(db):
 def test_fail_task_retry(db, monkeypatch):
     """Test task retry mechanism and failure threshold."""
     # Mock config for max_task_retries
-    monkeypatch.setattr(config, "max_task_retries", 2)
+    monkeypatch.setattr(config.timeouts, "max_task_retries", 2)
 
-    db.add_task("ISSUE", "org/repo1", "issue-1")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
 
@@ -112,7 +112,7 @@ def test_fail_task_retry(db, monkeypatch):
 
 def test_get_active_claimed_task(db):
     """Test getting an active claimed task."""
-    db.add_task("ISSUE", "org/repo1", "issue-1")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     tasks = db.get_pending_tasks()
     task_id = tasks[0]["id"]
     db.claim_task(task_id)
@@ -124,6 +124,6 @@ def test_get_active_claimed_task(db):
 
 def test_task_exists(db):
     """Test existence check for tasks."""
-    db.add_task("ISSUE", "org/repo1", "issue-1")
+    db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     assert db.task_exists("org/repo1", "issue-1") is True
     assert db.task_exists("org/repo1", "non-existent") is False

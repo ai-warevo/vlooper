@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class EventName(str, Enum):
     """Centralized registry of all system-wide event names."""
 

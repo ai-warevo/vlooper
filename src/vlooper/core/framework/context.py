@@ -1,22 +1,24 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
+
 
 @dataclass
 class TaskContext:
     """
     Represents the global mutable state that travels through the execution pipeline.
-    This context encapsulates task primitives, execution artifacts, control flags, 
+    This context encapsulates task primitives, execution artifacts, control flags,
     and arbitrary metadata.
     """
+
     task_id: str
     issue_number: int
     repo_url: str
-    repo_full_name: Optional[str] = None
-    branch_name: Optional[str] = None
-    exit_code: Optional[int] = None
-    error_logs: Optional[str] = None
+    repo_full_name: str | None = None
+    branch_name: str | None = None
+    exit_code: int | None = None
+    error_logs: str | None = None
     is_aborted: bool = False
-    error: Optional[Exception] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    issue_title: Optional[str] = None
-    issue_body: Optional[str] = None
+    error: Exception | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    issue_title: str | None = None
+    issue_body: str | None = None

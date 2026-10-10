@@ -1,11 +1,14 @@
 import shlex
 import subprocess
-from ..framework.context import TaskContext
-from ..framework.events import EventName
+
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 
+from ..framework.context import TaskContext
+from ..framework.events import EventName
+
 logger = get_logger(__name__)
+
 
 def run_repository_tests(ctx: TaskContext) -> None:
     """
@@ -27,7 +30,7 @@ def run_repository_tests(ctx: TaskContext) -> None:
             cwd=ctx.workspace_path,
             capture_output=True,
             text=True,
-            check=False  # We handle the exit code manually
+            check=False,  # We handle the exit code manually
         )
 
         ctx.exit_code = result.returncode
@@ -41,10 +44,13 @@ def run_repository_tests(ctx: TaskContext) -> None:
                 event_bus.emit(EventName.HARNESS_TEST_PASSED, {"task_id": ctx.task_id})
         else:
             logger.warning("Tests failed with exit code %d.", ctx.exit_code)
-            logger.error("--- TEST FAILURE DETAILS ---\n%s\n-----------------------------", ctx.error_logs)
+            logger.error(
+                "--- TEST FAILURE DETAILS ---\n%s\n-----------------------------",
+                ctx.error_logs,
+            )
 
     except Exception as e:
-        logger.exception("Critical error while running test harness: %s", e)
+        logger.exception("Critical error while running test harness")
         ctx.exit_code = -1
         ctx.error_logs = str(e)
         ctx.is_aborted = True

@@ -17,7 +17,16 @@ def clone_repository(repo_full_name, repo_short_name, base_dir):
 
 def get_item_info(num, repo_full_name, item_type="issue", fields="title,body"):
     """Fetch issue or PR information with specified JSON fields via GitHub CLI."""
-    cmd = ["gh", item_type, "view", str(num), "--repo", repo_full_name, "--json", fields]
+    cmd = [
+        "gh",
+        item_type,
+        "view",
+        str(num),
+        "--repo",
+        repo_full_name,
+        "--json",
+        fields,
+    ]
     res, err = run_command(cmd)
     if err or not res:
         return None
@@ -99,7 +108,7 @@ def post_comment(repo_full_name, num, message):
     """Post a comment to an issue or PR."""
     cmd = [
         "gh",
-        "issue", # works for both issues and prs in gh CLI for commenting
+        "issue",  # works for both issues and prs in gh CLI for commenting
         "comment",
         str(num),
         "--repo",
@@ -131,7 +140,12 @@ def get_issue_author(repo_full_name, num):
     return res.strip()
 
 
-def search_issues(org_name, bot_username, is_pr=False, fields="number,title,body,repository,isPullRequest,author"):
+def search_issues(
+    org_name,
+    bot_username,
+    is_pr=False,
+    fields="number,title,body,repository,isPullRequest,author",
+):
     """Search for issues or PRs in an organization assigned to a user."""
     filter_type = "is:pr" if is_pr else "is:issue"
     cmd = [

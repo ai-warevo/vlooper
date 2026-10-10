@@ -1,27 +1,23 @@
 """Service for orchestrating Git operations and high-level workspace management."""
 
-import os
-
-from vlooper.config import config
+from vlooper.clients.git_client import (
+    add_all,
+    checkout,
+    clean_files,
+    commit,
+    create_branch,
+    delete_branch,
+    get_default_branch,
+    has_uncommitted_changes,
+    is_remote_branch_exists,
+    pull,
+    push,
+    reset_hard,
+    stash,
+)
 from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
-from vlooper.clients.git_client import (
-    checkout,
-    create_branch,
-    pull,
-    commit,
-    push,
-    get_default_branch,
-    reset_hard,
-    clean_files,
-    delete_branch,
-    stash,
-    is_remote_branch_exists,
-    has_uncommitted_changes,
-    add_all
-)
 from vlooper.infra.utils import run_command
-
 
 logger = get_logger(__name__)
 
@@ -48,7 +44,9 @@ def setup_working_branch(repo_dir, branch_name, task_type):
         checkout(repo_dir, branch_name, force=True)
     except VLooperError as e:
         if task_type == "ISSUE":
-            logger.info("Creating new issue branch %s from default branch...", branch_name)
+            logger.info(
+                "Creating new issue branch %s from default branch...", branch_name
+            )
             default_branch = get_default_branch(repo_dir)
             create_branch(repo_dir, branch_name, start_point=default_branch)
         else:
@@ -62,7 +60,13 @@ def setup_working_branch(repo_dir, branch_name, task_type):
     return True
 
 
-def commit_and_push(repo_dir, branch_name, commit_msg, user_name: str = None, user_email: str = None):
+def commit_and_push(
+    repo_dir,
+    branch_name,
+    commit_msg,
+    user_name: str | None = None,
+    user_email: str | None = None,
+):
     """Orchestrates committing changes and pushing with a rebase strategy."""
     # 1. Commit
     if has_uncommitted_changes(repo_dir):
@@ -79,7 +83,7 @@ def commit_and_push(repo_dir, branch_name, commit_msg, user_name: str = None, us
         if not success:
             raise VLooperError(f"Rebase failed/conflict detected: {err}")
     else:
-         logger.info("First push for branch %s.", branch_name)
+        logger.info("First push for branch %s.", branch_name)
 
     # 3. Push
     push(repo_dir, branch_name)
@@ -94,7 +98,7 @@ def cleanup_workspace(repo_dir, branch_name):
     try:
         default_branch = get_default_branch(repo_dir)
         checkout(repo_dir, default_branch, force=True)
-    except VLooperError as e:
+    except VLooperError:
         logger.warning("Could not checkout main during cleanup. Detaching HEAD.")
         _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
         if err:

@@ -2,8 +2,8 @@
 
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.persistence.database import Database
 from vlooper.infra.utils import run_command
+from vlooper.persistence.database import Database
 
 __all__ = [
     "Database",

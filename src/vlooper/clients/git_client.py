@@ -1,12 +1,9 @@
 """Git CLI client for vLooper operations. Purely executes git commands."""
 
-import os
-
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import run_command
-
 
 logger = get_logger(__name__)
 
@@ -53,23 +50,29 @@ def pull(repo_dir, remote="origin", branch=None, rebase=False):
     return True, None
 
 
-def commit(repo_dir, commit_msg, user_name: str = None, user_email: str = None):
+def commit(
+    repo_dir, commit_msg, user_name: str | None = None, user_email: str | None = None
+):
     """Commit changes. Uses configured user info by default, or overrides if provided."""
     logger.info("Committing changes...")
-    
+
     # Determine which identity to use (fallback to config if not explicitly provided)
     final_user_name = user_name or config.git.git_user_name
     final_user_email = user_email or config.git.git_user_email
 
     commit_cmd = [
         "git",
-        "-c", f"user.name={final_user_name}",
-        "-c", f"user.email={final_user_email}",
+        "-c",
+        f"user.name={final_user_name}",
+        "-c",
+        f"user.email={final_user_email}",
         "commit",
         "-am",
         commit_msg,
     ]
-    stdout, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
+    _stdout, err = run_command(
+        commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout
+    )
     if err:
         if "nothing to commit" in err or "working tree clean" in err:
             logger.info("Nothing to commit (working tree is clean).")
@@ -165,4 +168,3 @@ def get_diff(repo_dir, base_branch=None):
     if err:
         return None, err
     return stdout, None
-

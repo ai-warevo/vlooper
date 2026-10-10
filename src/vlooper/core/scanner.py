@@ -1,15 +1,14 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
-from typing import Any, Dict, Optional
-
-import json
+from typing import Any
 
 from vlooper.config import config
-from vlooper.persistence.database import Database
 from vlooper.infra.logger import get_logger
+from vlooper.persistence.database import Database
 from vlooper.services.github_service import get_assigned_items, get_github_item
 
 logger = get_logger(__name__)
+
 
 class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
@@ -24,7 +23,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.info("Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
 
-        logger.info("Scanning for new tasks in organization: %s...", config.git.org_name)
+        logger.info(
+            "Scanning for new tasks in organization: %s...", config.git.org_name
+        )
         self._scan_issues()
         self._scan_prs()
 
@@ -38,9 +39,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
             logger.debug("No stale failed tasks found to retry.")
             return
 
-        logger.info(
-            "Found %s stale failed tasks. Resetting them...", len(failed_tasks)
-        )
+        logger.info("Found %s stale failed tasks. Resetting them...", len(failed_tasks))
         for task in failed_tasks:
             logger.debug("Resetting task #%s to PENDING.", task["id"])
             self.db.reset_task_status(task["id"])
@@ -58,11 +57,15 @@ class Scanner:  # pylint: disable=too-few-public-methods
         """Generic scanner for issues and PRs."""
         config_data = self._get_scan_config(is_pr)
 
-        logger.debug("Scanning for %s in organization: %s...", config_data["label"], config.git.org_name)
+        logger.debug(
+            "Scanning for %s in organization: %s...",
+            config_data["label"],
+            config.git.org_name,
+        )
         items, err = get_assigned_items(
             org_name=config.git.org_name,
             bot_username=config.git.bot_username,
-            is_pr=is_pr
+            is_pr=is_pr,
         )
 
         if err:
@@ -87,7 +90,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
             self._process_scan_item(item, config_data, is_pr)
 
-    def _get_scan_config(self, is_pr: bool) -> Dict[str, str]:
+    def _get_scan_config(self, is_pr: bool) -> dict[str, str]:
         """Returns configuration metadata for the scan type."""
         if is_pr:
             return {
@@ -95,17 +98,19 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 "error_label": "PR",
                 "empty_label": "PRs",
                 "task_label": "PR",
-                "db_type": "PR"
+                "db_type": "PR",
             }
         return {
             "label": "issues",
             "error_label": "Issue",
             "empty_label": "issues",
             "task_label": "issue",
-            "db_type": "ISSUE"
+            "db_type": "ISSUE",
         }
 
-    def _process_scan_item(self, item: Dict[str, Any], config_data: Dict[str, str], is_pr: bool):
+    def _process_scan_item(
+        self, item: dict[str, Any], config_data: dict[str, str], is_pr: bool
+    ):
         """Processes a single item found during scanning."""
         num = item["number"]
         repo_full_name = item["repository"]["nameWithOwner"]
@@ -116,21 +121,28 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
         logger.debug(
             "Adding task for %s #%s: %s (branch: %s)",
-            config_data["task_label"], num, repo_full_name, branch
+            config_data["task_label"],
+            num,
+            repo_full_name,
+            branch,
         )
         self.db.add_task(
             config_data["db_type"],
             repo_full_name,
             f"https://github.com/{repo_full_name}",
             num,
-            branch
+            branch,
         )
 
-    def _resolve_branch_name(self, num: int, repo_full_name: str, is_pr: bool) -> Optional[str]:
+    def _resolve_branch_name(
+        self, num: int, repo_full_name: str, is_pr: bool
+    ) -> str | None:
         """Resolves the appropriate branch name for an issue or PR."""
         if is_pr:
             logger.debug("Fetching details for PR #%s to get head branch...", num)
-            item_data = get_github_item(num, repo_full_name, item_type="pr", fields=["headRefName"])
+            item_data = get_github_item(
+                num, repo_full_name, item_type="pr", fields=["headRefName"]
+            )
             if not item_data:
                 logger.debug("Could not fetch details for PR #%s. Skipping.", num)
                 return None

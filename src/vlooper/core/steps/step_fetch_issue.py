@@ -1,8 +1,10 @@
-from ..framework.context import TaskContext
 from vlooper.clients.github_client import get_issue_details
 from vlooper.infra.logger import get_logger
 
+from ..framework.context import TaskContext
+
 logger = get_logger(__name__)
+
 
 def fetch_issue_context(ctx: TaskContext) -> None:
     """
@@ -13,7 +15,9 @@ def fetch_issue_context(ctx: TaskContext) -> None:
         return
 
     if not ctx.repo_full_name:
-        logger.warning("Cannot fetch issue details: repo_full_name is missing in context.")
+        logger.warning(
+            "Cannot fetch issue details: repo_full_name is missing in context."
+        )
         return
 
     try:

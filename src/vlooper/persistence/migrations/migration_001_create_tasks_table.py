@@ -1,5 +1,6 @@
 from vlooper.persistence.migrations.base import Migration
 
+
 class CreateTasksTable(Migration):
     """Initial migration to create the tasks table."""
 

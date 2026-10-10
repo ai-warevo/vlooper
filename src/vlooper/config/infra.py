@@ -1,9 +1,11 @@
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
+
 
 @dataclass
 class InfraConfig:
     """Infrastructure related configuration."""
+
     test_command: str = field(
         default_factory=lambda: os.environ.get("TEST_COMMAND", "./test.sh")
     )

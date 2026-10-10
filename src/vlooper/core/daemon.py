@@ -5,45 +5,49 @@ import fcntl
 import signal
 import sys
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from vlooper.config import config
-from vlooper.persistence.database import Database
-from vlooper.infra.logger import get_logger
-from vlooper.core.scanner import Scanner
-from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
-from vlooper.core.event_handlers.github_notification_handler import GitHubNotificationHandler
-from vlooper.core.event_handlers.github_pickup_handler import GitHubPickupHandler
-from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
-from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
 from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
+from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
+from vlooper.core.event_handlers.github_notification_handler import (
+    GitHubNotificationHandler,
+)
+from vlooper.core.event_handlers.github_pickup_handler import GitHubPickupHandler
 from vlooper.core.event_handlers.pr_created_handler import PrCreatedHandler
-from vlooper.core.framework.events import EventName
+from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
+from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
 
 # Framework imports
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.event_bus import EventBus
+from vlooper.core.framework.events import EventName
 from vlooper.core.framework.pipeline import TaskPipeline
-from vlooper.core.middleware.middleware_error_handler import GlobalExceptionHandlerMiddleware
+from vlooper.core.middleware.middleware_error_handler import (
+    GlobalExceptionHandlerMiddleware,
+)
 from vlooper.core.middleware.middleware_github_auth import GitHubAuthCheckMiddleware
 from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
-from vlooper.core.steps.step_git_isolate import git_isolate_repository
-from vlooper.core.steps.step_fetch_issue import fetch_issue_context
-from vlooper.core.steps.step_run_tests import run_repository_tests
+from vlooper.core.scanner import Scanner
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
+from vlooper.core.steps.step_fetch_issue import fetch_issue_context
+from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_github_pr import github_create_pull_request
+from vlooper.core.steps.step_run_tests import run_repository_tests
+from vlooper.infra.logger import get_logger
+from vlooper.persistence.database import Database
 
 logger = get_logger(__name__)
 
 
 class VLooperDaemon:
     """
-    The main daemon process for vLooper, responsible for polling task targets 
+    The main daemon process for vLooper, responsible for polling task targets
     and bootstrapping the automated execution pipeline.
-    
-    This class follows a declarative architecture where it initializes the 
-    TaskPipeline with a predefined stack of middlewares and automation steps. 
-    It does not contain any business logic; instead, it acts as the orchestration 
+
+    This class follows a declarative architecture where it initializes the
+    TaskPipeline with a predefined stack of middlewares and automation steps.
+    It does not contain any business logic; instead, it acts as the orchestration
     layer that bridges the database/scanning layer with the execution engine.
     """
 
@@ -69,8 +73,12 @@ class VLooperDaemon:
         self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
         self.event_bus.subscribe(EventName.TASK_PICKED_UP, github_pickup_handler.handle)
         self.event_bus.subscribe(EventName.GIT_ISOLATED, git_isolated_handler.handle)
-        self.event_bus.subscribe(EventName.HARNESS_TEST_PASSED, test_passed_handler.handle)
-        self.event_bus.subscribe(EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle)
+        self.event_bus.subscribe(
+            EventName.HARNESS_TEST_PASSED, test_passed_handler.handle
+        )
+        self.event_bus.subscribe(
+            EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle
+        )
         self.event_bus.subscribe(EventName.GITHUB_PR_CREATED, pr_created_handler.handle)
 
         # Core Pipeline Bootstrap
@@ -82,16 +90,19 @@ class VLooperDaemon:
 
     def _bootstrap_pipeline(self) -> TaskPipeline:
         """
-        Declaratively configures the central task pipeline with its 
+        Declaratively configures the central task pipeline with its
         middleware onion layers and sequential execution steps.
         """
         return (
             TaskPipeline(self.event_bus)
             # Middleware Layering (Outer to Inner)
             .use(GlobalExceptionHandlerMiddleware())  # Catches unforeseen bugs
-            .use(GitHubAuthCheckMiddleware())         # Fails early if tokens missing
-            .use(RetryLimitMiddleware(max_pipeline_attempts=config.timeouts.max_pipeline_attempts)) # Controls test-fix retries
-
+            .use(GitHubAuthCheckMiddleware())  # Fails early if tokens missing
+            .use(
+                RetryLimitMiddleware(
+                    max_pipeline_attempts=config.timeouts.max_pipeline_attempts
+                )
+            )  # Controls test-fix retries
             # Execution Step Sequencing (Core Work)
             .add_step(git_isolate_repository, "📂 Isolating repository")
             .add_step(fetch_issue_context, "🔍 Fetching issue context")
@@ -105,16 +116,18 @@ class VLooperDaemon:
         logger.info("\nStopping daemon...")
         self.running = False
 
-    def _map_task_to_context(self, task: Dict[str, Any]) -> TaskContext:
+    def _map_task_to_context(self, task: dict[str, Any]) -> TaskContext:
         """Maps a raw database task record into an isolated TaskContext instance."""
         return TaskContext(
             task_id=str(task["id"]),
-            issue_number=int(task["issue_number"]) if task["issue_number"] is not None else 0,
+            issue_number=(
+                int(task["issue_number"]) if task["issue_number"] is not None else 0
+            ),
             repo_url=str(task["repo_url"]),
             metadata={
                 "event_bus": self.event_bus,  # Required for steps to emit events
-                "original_task": task         # Preserve original record if needed
-            }
+                "original_task": task,  # Preserve original record if needed
+            },
         )
 
     @contextlib.contextmanager
@@ -131,7 +144,7 @@ class VLooperDaemon:
                 logger.error("Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
-    def _get_next_task(self, retry_failed: bool) -> Optional[Dict[str, Any]]:
+    def _get_next_task(self, retry_failed: bool) -> dict[str, Any] | None:
         """Scans and retrieves the next available task."""
         logger.debug("--- Starting iteration (scanning for tasks) ---")
         self.scanner.scan(retry_failed=retry_failed)
@@ -145,24 +158,38 @@ class VLooperDaemon:
 
         return tasks[0] if tasks else None
 
-    def _process_task(self, task: Dict[str, Any]) -> None:
+    def _process_task(self, task: dict[str, Any]) -> None:
         """Handles the end-to-end lifecycle of a single task."""
-        logger.info("Target identified: Task #%s (Type: %s, Repo: %s)", 
-                    task["id"], task["task_type"], task["repo_full_name"])
+        logger.info(
+            "Target identified: Task #%s (Type: %s, Repo: %s)",
+            task["id"],
+            task["task_type"],
+            task["repo_full_name"],
+        )
 
         # Mark as being processed in DB before running to prevent double-claiming
         logger.debug("Attempting to claim task #%s...", task["id"])
         if not self.db.claim_task(task["id"]):
-            logger.debug("Task #%s already claimed or ineligible (max retries reached). Skipping.", task["id"])
+            logger.debug(
+                "Task #%s already claimed or ineligible (max retries reached). Skipping.",
+                task["id"],
+            )
             return
 
-        logger.info("Task #%s claimed successfully. Initializing pipeline context...", task["id"])
+        logger.info(
+            "Task #%s claimed successfully. Initializing pipeline context...",
+            task["id"],
+        )
         ctx = self._map_task_to_context(task)
 
         # Emit pickup event to notify GitHub that the agent is working on it
         self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
 
-        logger.info("Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
+        logger.info(
+            "Executing pipeline for Task #%s (Issue #%s)...",
+            ctx.task_id,
+            ctx.issue_number,
+        )
         self.pipeline.run(ctx)
 
         # Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
@@ -175,7 +202,10 @@ class VLooperDaemon:
                 task = self._get_next_task(retry_failed)
 
                 if not task:
-                    logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.timeouts.loop_sleep_seconds)
+                    logger.debug(
+                        "No active tasks found in this scan. Sleeping for %ss...",
+                        config.timeouts.loop_sleep_seconds,
+                    )
                     time.sleep(config.timeouts.loop_sleep_seconds)
                     continue
 
@@ -185,15 +215,18 @@ class VLooperDaemon:
                 logger.debug("Iteration complete. Sleeping...")
                 time.sleep(config.timeouts.loop_sleep_seconds)
 
-            except Exception as e:
-                logger.error("Unexpected error in daemon loop: %s", e, exc_info=True)
-                logger.debug("Sleeping for error recovery period (%ss)...", config.timeouts.error_wait_seconds)
+            except Exception:
+                logger.exception("Unexpected error in daemon loop")
+                logger.debug(
+                    "Sleeping for error recovery period (%ss)...",
+                    config.timeouts.error_wait_seconds,
+                )
                 time.sleep(config.timeouts.error_wait_seconds)
 
     def run(self, retry_failed: bool = False) -> None:
         """
         Main execution loop that orchestrates task scanning and processing.
- 
+
         Args:
             retry_failed: If True, only poll for tasks marked as FAILED in the DB.
         """
@@ -203,14 +236,14 @@ class VLooperDaemon:
                     "vLooper Daemon started with lock acquired. (Retry mode: %s)",
                     retry_failed,
                 )
- 
+
                 self._execute_loop(retry_failed)
                 logger.info("Daemon shut down.")
- 
+
         except SystemExit:
             raise
-        except Exception as e:
-            logger.error("Fatal error in daemon: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Fatal error in daemon")
 
 
 def main(retry_failed: bool = False) -> None:

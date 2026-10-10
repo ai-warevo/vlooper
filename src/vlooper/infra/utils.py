@@ -4,16 +4,27 @@ import subprocess
 
 from vlooper.infra.logger import get_logger
 
-
 logger = get_logger(__name__)
 
 
-def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None, input: str | None = None):
+def run_command(
+    cmd,
+    cwd=None,
+    timeout=None,
+    truncate_lines: int | None = None,
+    input: str | None = None,
+):
     """Run a shell command with an optional timeout and truncation."""
     logger.debug("running command %s", cmd)
     try:
         res = subprocess.run(
-            cmd, capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False, input=input
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=timeout,
+            check=False,
+            input=input,
         )
         if res.returncode != 0:
             stdout = res.stdout

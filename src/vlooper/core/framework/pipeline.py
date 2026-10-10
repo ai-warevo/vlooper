@@ -1,8 +1,10 @@
-from typing import List, Callable, Optional
-from .context import TaskContext
-from .types import Middleware, StepFn, NextFn
-from .event_bus import EventBus
+from collections.abc import Callable
+
 from vlooper.infra.logger import get_logger
+
+from .context import TaskContext
+from .event_bus import EventBus
+from .types import Middleware, NextFn, StepFn
 
 logger = get_logger(__name__)
 
@@ -10,19 +12,20 @@ logger = get_logger(__name__)
 class TaskPipeline:
     """
     The core orchestration engine for the vLooper automation daemon.
-    It implements a pipeline architecture using middleware (onion layers) 
+    It implements a pipeline architecture using middleware (onion layers)
     and sequential execution steps.
     """
+
     def __init__(self, event_bus: EventBus) -> None:
         """
         Initializes the TaskPipeline with a shared EventBus.
-        
+
         Args:
             event_bus: The central event bus instance for reactivity and logging.
         """
         self._event_bus = event_bus
-        self._middlewares: List[Middleware] = []
-        self._steps: List[StepFn] = []
+        self._middlewares: list[Middleware] = []
+        self._steps: list[StepFn] = []
 
     def use(self, middleware: Middleware) -> "TaskPipeline":
         """
@@ -31,14 +34,14 @@ class TaskPipeline:
 
         Args:
             middleware: A callable adhering to the Middleware protocol.
-            
+
         Returns:
             Self for method chaining.
         """
         self._middlewares.append(middleware)
         return self
 
-    def add_step(self, step: StepFn, description: Optional[str] = None) -> "TaskPipeline":
+    def add_step(self, step: StepFn, description: str | None = None) -> "TaskPipeline":
         """
         Adds an automation step to be executed sequentially in the pipeline core.
 
@@ -55,10 +58,9 @@ class TaskPipeline:
         self._steps.append(step)
         return self
 
-
     def run(self, ctx: TaskContext) -> None:
         """
-        Executes the pipeline. It wraps all registered steps in the onion layers 
+        Executes the pipeline. It wraps all registered steps in the onion layers
         provided by the registered middlewares.
 
         If `ctx.is_aborted` is set to True at any point (either via a step or a middleware),
@@ -86,15 +88,15 @@ class TaskPipeline:
 
                 try:
                     step(ctx)
-                except Exception as e:
-                    logger.error("[Step] Error in %s: %s", step_name, e, exc_info=True)
-                    raise e
+                except Exception:
+                    logger.exception("[Step] Error in %s", step_name)
+                    raise
 
         # The 'current_next' starts pointing to the base executor (the innermost part of the onion).
         current_next: NextFn = base_executor
 
-        # Wrap current_next with middlewares, starting from the last one added 
-        # and moving towards the first one. This ensures that the FIRST middleware 
+        # Wrap current_next with middlewares, starting from the last one added
+        # and moving towards the first one. This ensures that the FIRST middleware
         # registered becomes the OUTERMOST layer of the execution stack.
         for middleware in reversed(self._middlewares):
             # Capture the current state of the next function for this specific layer's closure.

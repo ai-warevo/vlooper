@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
 import os
-from typing import Optional
+from dataclasses import dataclass, field
+
 
 @dataclass
 class GitConfig:
     """Git related configuration."""
+
     org_name: str = field(
         default_factory=lambda: os.environ.get("ORG_NAME", "ai-warevo")
     )
@@ -17,11 +18,13 @@ class GitConfig:
     git_user_email: str = field(
         default_factory=lambda: os.environ.get("GIT_USER_EMAIL", "ai-bot@://github.com")
     )
-    gh_token: Optional[str] = field(
+    gh_token: str | None = field(
         default_factory=lambda: os.environ.get("GH_TOKEN", None)
     )
     authorized_users: list[str] = field(
         default_factory=lambda: [
-            u.strip() for u in os.environ.get("AUTHORIZED_USERS", "").split(",") if u.strip()
+            u.strip()
+            for u in os.environ.get("AUTHORIZED_USERS", "").split(",")
+            if u.strip()
         ]
     )

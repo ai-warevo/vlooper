@@ -1,17 +1,20 @@
-from typing import Any, Callable, Dict, List
 import logging
+from collections.abc import Callable
+from typing import Any
 
 # Set up a basic logger for the event bus to report subscriber errors
 logger = logging.getLogger(__name__)
 
+
 class EventBus:
     """
-    A decoupled, synchronous event bus that facilitates reactive updates 
+    A decoupled, synchronous event bus that facilitates reactive updates
     and logging triggers throughout the system.
     It allows components to subscribe to events and emit them without direct coupling.
     """
+
     def __init__(self) -> None:
-        self._subscribers: Dict[str, List[Callable[[Any], None]]] = {}
+        self._subscribers: dict[str, list[Callable[[Any], None]]] = {}
 
     def subscribe(self, event_name: str, callback: Callable[[Any], None]) -> None:
         """Registers a callback for a specific event name."""
@@ -21,8 +24,8 @@ class EventBus:
 
     def emit(self, event_name: str, data: Any) -> None:
         """
-        Emits an event to all subscribed callbacks. 
-        Failures in individual subscribers are caught and logged to ensure that 
+        Emits an event to all subscribed callbacks.
+        Failures in individual subscribers are caught and logged to ensure that
         the core pipeline execution remains uninterrupted by UI or logging errors.
         """
         logger.debug("Emitting event '%s' with data: %s", event_name, data)
@@ -32,6 +35,8 @@ class EventBus:
         for callback in self._subscribers[event_name]:
             try:
                 callback(data)
-            except Exception as e:
+            except Exception:
                 # Critical: Prevent subscriber failures from crashing the core pipeline.
-                logger.error(f"Error in EventBus subscriber for event '{event_name}': {e}", exc_info=True)
+                logger.exception(
+                    f"Error in EventBus subscriber for event '{event_name}'"
+                )

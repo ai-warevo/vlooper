@@ -1,15 +1,16 @@
 import os
-from ..framework.context import TaskContext
-from ..framework.types import StepFn
-from ..framework.events import EventName
-from vlooper.services.git_service import prepare_repository, setup_working_branch
-from vlooper.services.github_service import clone_repository_workflow
+
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
+from vlooper.services.git_service import prepare_repository, setup_working_branch
+from vlooper.services.github_service import clone_repository_workflow
 
+from ..framework.context import TaskContext
+from ..framework.events import EventName
 
 logger = get_logger(__name__)
+
 
 def _parse_repo_info(url: str) -> tuple[str, str]:
     """
@@ -19,7 +20,7 @@ def _parse_repo_info(url: str) -> tuple[str, str]:
     """
     # Clean trailing .git if present
     clean_url = url.removesuffix(".git")
-    
+
     # If it's a full URL, strip the protocol and domain
     if "://" in clean_url:
         parts = clean_url.split("/")
@@ -29,13 +30,14 @@ def _parse_repo_info(url: str) -> tuple[str, str]:
             short_name = parts[4]
             return full_name, short_name
         else:
-             raise VLooperError(f"Could not parse repository info from URL: {url}")
+            raise VLooperError(f"Could not parse repository info from URL: {url}")
     else:
         # It's already in 'owner/repo' format
         parts = clean_url.split("/")
         if len(parts) == 2:
             return clean_url, parts[1]
         raise VLooperError(f"Could not parse repository info from: {url}")
+
 
 def git_isolate_repository(ctx: TaskContext) -> None:
     """
@@ -44,19 +46,21 @@ def git_isolate_repository(ctx: TaskContext) -> None:
     """
     # Identify task type from original record
     task_type = ctx.metadata["original_task"]["task_type"]
-    logger.info("Isolating repository for %s #%s...", task_type.lower(), ctx.issue_number)
+    logger.info(
+        "Isolating repository for %s #%s...", task_type.lower(), ctx.issue_number
+    )
 
     try:
         full_name, short_name = _parse_repo_info(ctx.repo_url)
-        
-        # Determine branch name: 
+
+        # Determine branch name:
         # Issues get a new standardized fix branch.
         # PRs use the existing head branch captured by the scanner.
         if task_type == "ISSUE":
             branch_name = f"vlooper/fix-{ctx.issue_number}"
         else:
             branch_name = ctx.branch_name
-        
+
         # Determine if we should skip reset (for retry attempts)
         attempt_count = ctx.metadata.get("attempt_count", 0)
         skip_reset = attempt_count > 1
@@ -75,10 +79,10 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         else:
             # If it exists, we prepare its state (reset/pull) via git_service
             prepare_repository(repo_dir, skip_reset=skip_reset)
-        
+
         # 2. Set up the new feature branch
         setup_working_branch(repo_dir, branch_name, task_type=task_type)
-        
+
         # Update context
         ctx.workspace_path = repo_dir
         ctx.branch_name = branch_name
@@ -88,15 +92,23 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         # Emit success event
         event_bus = ctx.metadata.get("event_bus")
         if event_bus:
-            event_bus.emit(EventName.GIT_ISOLATED, {
-                "task_id": ctx.task_id,
-                "repo": full_name,
-                "branch": branch_name,
-                "workspace": repo_dir
-            })
-        
-        logger.info("Repository isolated at %s on branch %s (Attempt: %d)", repo_dir, branch_name, attempt_count)
+            event_bus.emit(
+                EventName.GIT_ISOLATED,
+                {
+                    "task_id": ctx.task_id,
+                    "repo": full_name,
+                    "branch": branch_name,
+                    "workspace": repo_dir,
+                },
+            )
 
-    except Exception as e:
-        logger.exception("Failed to isolate repository: %s", e)
-        raise e
+        logger.info(
+            "Repository isolated at %s on branch %s (Attempt: %d)",
+            repo_dir,
+            branch_name,
+            attempt_count,
+        )
+
+    except Exception:
+        logger.exception("Failed to isolate repository")
+        raise
