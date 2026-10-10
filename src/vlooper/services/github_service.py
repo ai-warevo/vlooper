@@ -11,7 +11,7 @@ from vlooper.clients.github_client import (
     get_item_info,
 )
 from vlooper.infra.logger import get_logger
-from vlooper.infra.utils import build_gh_view_cmd, run_command
+from vlooper.infra.utils import run_command
 
 
 logger = get_logger(__name__)

@@ -8,22 +8,6 @@ from vlooper.infra.logger import get_logger
 logger = get_logger(__name__)
 
 
-def build_gh_view_cmd(
-    cmd_type: str, num: int, repo: str, fields: list[str]
-) -> list[str]:
-    """Builds the base command for gh issue view or gh pr view."""
-    return [
-        "gh",
-        cmd_type,  # "issue" or "pr"
-        "view",
-        str(num),
-        "--repo",
-        repo,
-        "--json",
-        *fields,
-    ]
-
-
 def run_command(cmd, cwd=None, timeout=None, truncate_lines: int | None = None, input: str | None = None):
     """Run a shell command with an optional timeout and truncation."""
     logger.debug("running command %s", cmd)
