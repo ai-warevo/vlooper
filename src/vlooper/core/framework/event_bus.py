@@ -25,6 +25,7 @@ class EventBus:
         Failures in individual subscribers are caught and logged to ensure that 
         the core pipeline execution remains uninterrupted by UI or logging errors.
         """
+        logger.debug("Emitting event '%s' with data: %s", event_name, data)
         if event_name not in self._subscribers:
             return
 
