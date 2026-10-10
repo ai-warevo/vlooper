@@ -1,12 +1,14 @@
 """Module for interacting with GitHub via CLI (gh)."""
 
-from vlooper.infra.config import config
-from vlooper.core.exceptions import VLooperError
 from vlooper.clients.github_client import (
     clone_repository,
     create_pull_request,
     get_issue_details,
     get_pr_details,
+    post_comment,
+    get_issue_author,
+    search_issues,
+    get_item_info,
 )
 from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import build_gh_view_cmd, run_command
@@ -52,17 +54,7 @@ def post_github_comment(task, message):
             parts = branch_name.split("-")
             if len(parts) >= 2:
                 num = parts[-1]
-                comment_cmd = [
-                    "gh",
-                    "issue",
-                    "comment",
-                    str(num),
-                    "--repo",
-                    repo_full_name,
-                    "--body",
-                    message,
-                ]
-                _, err = run_command(comment_cmd)
+                _, err = post_comment(repo_full_name, num, message)
                 if err:
                     logger.warning(
                         "Failed to post GitHub comment for #%s: %s", num, err
@@ -75,7 +67,6 @@ def post_github_comment(task, message):
             logger.error("Error posting GitHub comment: %s", e)
     elif task_type == "PR":
         logger.debug("TODO: pr comment logic ...")
-        # For PRs, this is handled by different logic or requires more state.
 
 
 def get_github_author(task):
@@ -84,12 +75,9 @@ def get_github_author(task):
     if task["task_type"] == "ISSUE":
         num = get_issue_number(task)
         if num != "unknown" and num:
-            cmd = build_gh_view_cmd(
-                "issue", num, repo_full_name, ["author", "--jq", ".author.login"]
-            )
-            stdout, err = run_command(cmd)
-            if not err and stdout:
-                return stdout
+            author = get_issue_author(repo_full_name, num)
+            if author:
+                return author
     return "assignee"
 
 
@@ -101,3 +89,19 @@ def get_issue_number(task):
         except Exception:  # noqa: W0718
             return "unknown"
     return "PR"
+
+
+def get_assigned_items(org_name, bot_username, is_pr=False):
+    """Service method to fetch assigned items."""
+    return search_issues(
+        org_name=org_name,
+        bot_username=bot_username,
+        is_pr=is_pr
+    )
+
+
+def get_github_item(num, repo_full_name, item_type="issue", fields=None):
+    """Service method to fetch a specific GitHub item."""
+    if fields is None:
+        fields = "title,body"
+    return get_item_info(num, repo_full_name, item_type, fields)

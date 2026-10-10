@@ -15,9 +15,9 @@ def clone_repository(repo_full_name, repo_short_name, base_dir):
     return True, None
 
 
-def get_issue_info(num, repo_full_name, fields="title,body"):
-    """Fetch issue information with specified JSON fields via GitHub CLI."""
-    cmd = ["gh", "issue", "view", str(num), "--repo", repo_full_name, "--json", fields]
+def get_item_info(num, repo_full_name, item_type="issue", fields="title,body"):
+    """Fetch issue or PR information with specified JSON fields via GitHub CLI."""
+    cmd = ["gh", item_type, "view", str(num), "--repo", repo_full_name, "--json", fields]
     res, err = run_command(cmd)
     if err or not res:
         return None
@@ -27,7 +27,14 @@ def get_issue_info(num, repo_full_name, fields="title,body"):
         return None
 
 
+def get_issue_info(num, repo_full_name, fields="title,body"):
+    """Fetch issue information with specified JSON fields via GitHub CLI."""
+    return get_item_info(num, repo_full_name, "issue", fields)
+
+
 def get_issue_details(num, repo_full_name):
+    """Fetch issue details including title, body and comments."""
+...
     """Fetch issue details including title, body and comments."""
     data = get_issue_info(num, repo_full_name, "title,body")
     if not data:
@@ -89,6 +96,63 @@ def get_pr_details(repo_full_name, branch):
         return num, title, body, review_text
     except (json.JSONDecodeError, KeyError):
         return None
+
+
+def post_comment(repo_full_name, num, message):
+    """Post a comment to an issue or PR."""
+    cmd = [
+        "gh",
+        "issue", # works for both issues and prs in gh CLI for commenting
+        "comment",
+        str(num),
+        "--repo",
+        repo_full_name,
+        "--body",
+        message,
+    ]
+    res, err = run_command(cmd)
+    return res, err
+
+
+def get_issue_author(repo_full_name, num):
+    """Get the author of an issue or PR."""
+    cmd = [
+        "gh",
+        "issue",
+        "view",
+        str(num),
+        "--repo",
+        repo_full_name,
+        "--jq",
+        ".author.login",
+    ]
+    res, err = run_command(cmd)
+    if err or not res:
+        return None
+    return res.strip()
+
+
+def search_issues(org_name, bot_username, is_pr=False, fields="number,title,body,repository,isPullRequest"):
+    """Search for issues or PRs in an organization assigned to a user."""
+    filter_type = "is:pr" if is_pr else "is:issue"
+    cmd = [
+        "gh",
+        "search",
+        "issues",
+        f"org:{org_name}",
+        f"assignee:{bot_username}",
+        "state:open",
+        filter_type,
+        "--json",
+        fields,
+    ]
+    res, err = run_command(cmd)
+    if err or not res:
+        return None, err
+    try:
+        return json.loads(res), None
+    except (json.JSONDecodeError, KeyError):
+        return None, "Failed to parse issues JSON"
 
 
 def create_pull_request(repo_full_name, title, body, cwd=None, timeout=None):
