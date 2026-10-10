@@ -4,7 +4,6 @@ from pathlib import Path
 
 def get_all_py_files(root_dir):
     py_files = []
-    # Use a more controlled way to find files, skipping common heavy/hidden dirs
     exclude_dirs = {'.git', '__pycache__', '.venv', 'venv'}
     for path in Path(root_dir).rglob("*.py"):
         if not any(part in exclude_dirs for part in path.parts):
@@ -12,7 +11,6 @@ def get_all_py_files(root_dir):
     return py_files
 
 def get_module_name(file_path, src_root):
-    """Returns the expected module name of a file relative to src_root."""
     try:
         rel_path = file_path.relative_to(src_root)
         parts = list(rel_path.parts)
@@ -55,7 +53,6 @@ def analyze():
         except Exception as e:
             print(f"Error reading {f}: {e}")
 
-    # --- Unused Files Analysis ---
     mod_to_file = {}
     for f in all_py_files:
         if f.is_relative_to(src_root):
@@ -74,7 +71,6 @@ def analyze():
                 continue
             
             lines = content.splitlines()
-            # A bit more efficient: only check lines that might be imports
             for line in lines:
                 stripped = line.strip()
                 if stripped.startswith(('import ', 'from ')):
@@ -88,7 +84,6 @@ def analyze():
         if not is_imported:
             unused_files.append(file_path)
 
-    # --- Unused Definitions Analysis ---
     all_defs = []
     for f in all_py_files:
         defs = get_definitions(f)
@@ -107,13 +102,8 @@ def analyze():
             for i, line in enumerate(lines):
                 if other_file == d['file'] and (i + 1) == d['line']:
                     continue
-                
-                # Very basic check to see if it's a comment or string literal
-                # We don't want to count names in comments as usages.
-                # This is hard without a full parser, but let's try to at least avoid lines starting with #
                 if line.strip().startswith('#'):
                     continue
-
                 if re.search(pattern, line):
                     is_used = True
                     break
@@ -123,7 +113,6 @@ def analyze():
         if not is_used:
             unused_defs.append(d)
 
-    # Output results
     print("\n[?] Potential Unused Files:")
     if not unused_files:
         print("None found.")

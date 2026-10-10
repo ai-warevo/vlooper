@@ -12,7 +12,8 @@ dependencies = [
 
 [project.scripts]
 vlooper = "vlooper.__main__:main"
-check = "check:main"
+check = "src.check:main"
+analyze = "src.analyze_unused:analyze"
 
 [dependency-groups]
 dev = [
