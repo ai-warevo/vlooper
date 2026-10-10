@@ -5,7 +5,7 @@ from typing import ClassVar
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 
-from vlooper.infra.database import Database
+from vlooper.persistence.database import Database
 
 
 class VLooperTUI(App):

@@ -1,8 +1,8 @@
 """Database management for vLooper."""
 
-import sqlite3
-
 from vlooper.infra.config import config
+from vlooper.persistence.db_migrator import DBMigrator
+from vlooper.persistence.migrations import MIGRATIONS
 
 
 class Database:
@@ -11,31 +11,16 @@ class Database:
     def __init__(self, db_path=config.infra.db_path):
         """Initialize the database with a given path."""
         self.db_path = db_path
-        self._init_db()
+        self._run_migrations()
+
+    def _run_migrations(self):
+        """Run database migrations."""
+        migrator = DBMigrator(self.db_path)
+        migrator.migrate(MIGRATIONS, direction="up")
 
     def _get_connection(self):
         """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
-
-    def _init_db(self):
-        """Initialize the database schema."""
-        with self._get_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    task_type TEXT NOT NULL, -- ISSUE or PR
-                    repo_full_name TEXT NOT NULL,
-                    repo_url TEXT NOT NULL,
-                    issue_number INTEGER,
-                    branch_name TEXT NOT NULL,
-                    status TEXT NOT NULL, -- PENDING, CLAIMED, COMPLETED, FAILED
-                    retries INTEGER DEFAULT 0,
-                    last_error TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.commit()
 
     def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name):
         """Add a new task to the database."""

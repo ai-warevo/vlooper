@@ -7,7 +7,7 @@ import time
 from typing import Any, Dict, Optional
 
 from vlooper.infra.config import config
-from vlooper.infra.database import Database
+from vlooper.persistence.database import Database
 from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner
 from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler

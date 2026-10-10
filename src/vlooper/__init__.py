@@ -2,7 +2,7 @@
 
 from vlooper.infra.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.infra.database import Database
+from vlooper.persistence.database import Database
 from vlooper.infra.utils import run_command
 
 __all__ = [
