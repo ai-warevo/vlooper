@@ -17,37 +17,25 @@ from vlooper.clients.git_client import (
     stash,
     is_remote_branch_exists
 )
-from vlooper.clients.github_client import clone_repository
 from vlooper.utils import run_command
 
 
 logger = get_logger(__name__)
 
 
-def prepare_repository(repo_full_name, repo_short_name, skip_reset=False):
-    """Orchestrates preparing a workspace: cloning if needed and resetting to main."""
-    base_dir = os.path.expanduser(config.workspace_base_dir)
-    os.makedirs(base_dir, exist_ok=True)
-    repo_dir = os.path.join(base_dir, repo_short_name)
+def prepare_repository(repo_dir, skip_reset=False):
+    """Prepares an existing repository: resets to default branch and pulls."""
+    if skip_reset:
+        logger.info("⏩ Skipping reset for existing workspace.")
+        return
 
-    if not os.path.exists(repo_dir):
-        success, err = clone_repository(repo_full_name, repo_short_name, base_dir)
-        if not success:
-            raise VLooperError(f"Failed to clone repository: {err}")
-    else:
-        if skip_reset:
-            logger.info("⏩ Skipping reset for existing workspace.")
-            return repo_dir
-
-        logger.info("🧹 Resetting workspace to default branch...")
-        try:
-            default_branch = get_default_branch(repo_dir)
-            checkout(repo_dir, default_branch, force=True)
-            pull(repo_dir, "origin", default_branch)
-        except VLooperError as e:
-            logger.warning("⚠️ Reset/Pull failed, proceeding with existing state: %s", e)
-
-    return repo_dir
+    logger.info("🧹 Resetting workspace to default branch...")
+    try:
+        default_branch = get_default_branch(repo_dir)
+        checkout(repo_dir, default_branch, force=True)
+        pull(repo_dir, "origin", default_branch)
+    except VLooperError as e:
+        logger.warning("⚠️ Reset/Pull failed, proceeding with existing state: %s", e)
 
 
 def setup_working_branch(repo_dir, branch_name, task_type):

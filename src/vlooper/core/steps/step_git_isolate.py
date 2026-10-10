@@ -2,8 +2,11 @@ import os
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
 from vlooper.services.git_service import prepare_repository, setup_working_branch
+from vlooper.clients.github_client import clone_repository
+from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.logger import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -18,8 +21,6 @@ def _parse_repo_info(url: str) -> tuple[str, str]:
     
     # If it's a full URL, strip the protocol and domain
     if "://" in clean_url:
-        path_part = clean_url.split("://")[-1].split("/")[0] # This is wrong for github.com/owner/repo
-        # Correct approach for https://github.com/owner/repo
         parts = clean_url.split("/")
         # parts might be ['https:', '', 'github.com', 'owner', 'repo']
         if len(parts) >= 5:
@@ -59,8 +60,20 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         attempt_count = ctx.metadata.get("attempt_count", 0)
         skip_reset = attempt_count > 1
 
+        # Determine working directory
+        base_dir = os.path.expanduser(config.workspace_base_dir)
+        os.makedirs(base_dir, exist_ok=True)
+        repo_dir = os.path.join(base_dir, short_name)
+
         # 1. Clone and/or prepare directory
-        repo_dir = prepare_repository(full_name, short_name, skip_reset=skip_reset)
+        if not os.path.exists(repo_dir):
+            logger.info("📥 Cloning repository %s into %s...", full_name, repo_dir)
+            success, err = clone_repository(full_name, short_name, base_dir)
+            if not success:
+                raise VLooperError(f"Failed to clone repository: {err}")
+        else:
+            # If it exists, we prepare its state (reset/pull) via git_service
+            prepare_repository(repo_dir, skip_reset=skip_reset)
         
         # 2. Set up the new feature branch
         setup_working_branch(repo_dir, branch_name, task_type=task_type)
