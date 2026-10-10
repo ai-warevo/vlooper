@@ -12,6 +12,10 @@ from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner
 from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
 from vlooper.core.event_handlers.github_notification_handler import GitHubNotificationHandler
+from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
+from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
+from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
+from vlooper.core.event_handlers.pr_created_handler import PrCreatedHandler
 from vlooper.core.framework.events import EventName
 
 # Framework imports
@@ -52,9 +56,17 @@ class VLooperDaemon:
         # Register post-pipeline task handlers via EventBus
         status_handler = TaskStatusHandler(self.db)
         github_handler = GitHubNotificationHandler()
-        
+        git_isolated_handler = GitIsolatedHandler()
+        test_passed_handler = TestPassedHandler()
+        fixing_code_handler = FixingCodeHandler()
+        pr_created_handler = PrCreatedHandler()
+
         self.event_bus.subscribe(EventName.TASK_FINISHED, status_handler.handle)
         self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
+        self.event_bus.subscribe(EventName.GIT_ISOLATED, git_isolated_handler.handle)
+        self.event_bus.subscribe(EventName.HARNESS_TEST_PASSED, test_passed_handler.handle)
+        self.event_bus.subscribe(EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle)
+        self.event_bus.subscribe(EventName.GITHUB_PR_CREATED, pr_created_handler.handle)
 
         # Core Pipeline Bootstrap
         self.pipeline = self._bootstrap_pipeline()
