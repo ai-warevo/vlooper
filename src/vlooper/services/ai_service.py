@@ -3,8 +3,8 @@
 import os
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
-from vlooper.infra.utils import run_command
 from vlooper.clients.git_client import has_uncommitted_changes
+from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
@@ -32,14 +32,10 @@ def generate_commit_message(repo_dir: str, issue_number: int) -> str:
         f"{stdout[:4000]}"  # Limit diff size to avoid huge prompts
     )
 
-    # 3. Call Opencode agent
-    # We'll use 'opencode run --model <model> "<prompt>"'
-    cmd = ["opencode", "run", "--model", config.model_cfg.model, prompt]
-
+    # 3. Call Opencode agent via Client
+    client = OpencodeClient()
     try:
-        logger.debug("Executing AI command: %s", " ".join(cmd))
-        # We use a slightly higher timeout for LLM calls if needed
-        result, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
+        result, err = client.run(prompt, cwd=repo_dir)
 
         if err:
             logger.warning("AI commit message generation failed: %s. Using fallback.", err)

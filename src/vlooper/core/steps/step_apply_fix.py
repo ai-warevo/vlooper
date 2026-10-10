@@ -3,6 +3,7 @@ from ..framework.events import EventName
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import run_command
+from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
@@ -33,14 +34,13 @@ def apply_ai_fix(ctx: TaskContext) -> None:
 
     # The command we want to run: opencode run --model <model> <context/task_info>
     # We pass the string representation of ctx as it was in the original version.
-    opencode_cmd = ["opencode", "run", "--model", config.model_cfg.model, str(ctx)]
-    
-    logger.debug("Executing Agent Command: %s", " ".join(opencode_cmd))
+    client = OpencodeClient()
+    logger.debug("Executing Agent Command via client for task #%s", ctx.task_id)
 
     try:
         # We run the command in the workspace directory
-        _, err = run_command(
-            opencode_cmd,
+        _, err = client.run(
+            str(ctx),
             cwd=ctx.workspace_path,
             timeout=config.timeouts.opencode_run_timeout,
             truncate_lines=50,
