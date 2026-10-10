@@ -24,6 +24,18 @@ def checkout(repo_dir, branch, force=False):
     return True
 
 
+def create_branch(repo_dir, branch, start_point=None):
+    """Create a new branch."""
+    cmd = ["git", "checkout", "-b", branch]
+    if start_point:
+        cmd.append(start_point)
+    logger.debug("Executing: %s in %s", " ".join(cmd), repo_dir)
+    _, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
+    if err:
+        raise VLooperError(f"Git create branch failed: {err}")
+    return True
+
+
 def pull(repo_dir, remote="origin", branch=None, rebase=False):
     """Pull changes from a remote."""
     cmd = ["git", "pull"]

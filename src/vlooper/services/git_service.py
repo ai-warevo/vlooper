@@ -7,6 +7,7 @@ from vlooper.core.exceptions import VLooperError
 from vlooper.infra.logger import get_logger
 from vlooper.clients.git_client import (
     checkout,
+    create_branch,
     pull,
     commit,
     push,
@@ -41,7 +42,15 @@ def prepare_repository(repo_dir, skip_reset=False):
 def setup_working_branch(repo_dir, branch_name, task_type):
     """Prepares a new git branch for the given task."""
     logger.info("🌿 Preparing branch %s...", branch_name)
-    checkout(repo_dir, branch_name, force=True)
+    try:
+        checkout(repo_dir, branch_name, force=True)
+    except VLooperError as e:
+        if task_type == "ISSUE":
+            logger.info("✨ Creating new issue branch %s from default branch...", branch_name)
+            default_branch = get_default_branch(repo_dir)
+            create_branch(repo_dir, branch_name, start_point=default_branch)
+        else:
+            raise VLooperError(f"Could not find or create branch {branch_name}: {e}")
 
     if task_type == "PR":
         logger.info("📥 Pulling remote branch %s...", branch_name)
