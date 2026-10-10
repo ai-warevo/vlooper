@@ -16,7 +16,9 @@ from vlooper.clients.git_client import (
     clean_files,
     delete_branch,
     stash,
-    is_remote_branch_exists
+    is_remote_branch_exists,
+    has_uncommitted_changes,
+    add_all
 )
 from vlooper.infra.utils import run_command
 
@@ -63,7 +65,12 @@ def setup_working_branch(repo_dir, branch_name, task_type):
 def commit_and_push(repo_dir, branch_name, commit_msg):
     """Orchestrates committing changes and pushing with a rebase strategy."""
     # 1. Commit
-    commit(repo_dir, commit_msg)
+    if has_uncommitted_changes(repo_dir):
+        logger.info("💾 Finalizing changes...")
+        add_all(repo_dir)
+        commit(repo_dir, commit_msg)
+    else:
+        logger.info("✨ No uncommitted changes found. Skipping redundant commit.")
 
     # 2. Check if remote exists for smart rebase
     if is_remote_branch_exists(repo_dir, branch_name):

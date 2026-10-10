@@ -64,8 +64,11 @@ def commit(repo_dir, commit_msg):
         "-am",
         commit_msg,
     ]
-    _, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
+    stdout, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
+        if "nothing to commit" in err or "working tree clean" in err:
+            logger.info("ℹ️ Nothing to commit (working tree is clean).")
+            return True
         raise VLooperError(f"Git commit failed: {err}")
     return True
 
@@ -128,3 +131,20 @@ def is_remote_branch_exists(repo_dir, branch_name):
     if err:
         return False
     return stdout and branch_name in stdout
+
+
+def has_uncommitted_changes(repo_dir):
+    """Check if there are any uncommitted changes (staged, unstaged, or untracked)."""
+    stdout, err = run_command(["git", "status", "--porcelain"], cwd=repo_dir)
+    if err:
+        raise VLooperError(f"Failed to check git status: {err}")
+    return bool(stdout.strip())
+
+
+def add_all(repo_dir):
+    """Stage all changes (including untracked ones)."""
+    logger.info("📥 Staging all changes...")
+    _, err = run_command(["git", "add", "-A"], cwd=repo_dir)
+    if err:
+        raise VLooperError(f"Git add -A failed: {err}")
+
