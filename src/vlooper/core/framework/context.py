@@ -11,10 +11,12 @@ class TaskContext:
     task_id: str
     issue_number: int
     repo_url: str
-    workspace_path: Optional[str] = None
+    repo_full_name: Optional[str] = None
     branch_name: Optional[str] = None
     exit_code: Optional[int] = None
     error_logs: Optional[str] = None
     is_aborted: bool = False
     error: Optional[Exception] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    issue_title: Optional[str] = None
+    issue_body: Optional[str] = None

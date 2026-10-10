@@ -28,6 +28,7 @@ from vlooper.core.middleware.middleware_error_handler import GlobalExceptionHand
 from vlooper.core.middleware.middleware_github_auth import GitHubAuthCheckMiddleware
 from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
 from vlooper.core.steps.step_git_isolate import git_isolate_repository
+from vlooper.core.steps.step_fetch_issue import fetch_issue_context
 from vlooper.core.steps.step_run_tests import run_repository_tests
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
 from vlooper.core.steps.step_github_pr import github_create_pull_request
@@ -93,6 +94,7 @@ class VLooperDaemon:
 
             # Execution Step Sequencing (Core Work)
             .add_step(git_isolate_repository, "📂 Isolating repository")
+            .add_step(fetch_issue_context, "🔍 Fetching issue context")
             .add_step(run_repository_tests, "🧪 Running tests")
             .add_step(apply_ai_fix, "🤖 Applying AI fix")
             .add_step(github_create_pull_request, "🚀 Creating pull request")

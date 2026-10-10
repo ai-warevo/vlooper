@@ -33,14 +33,29 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         return
 
     # The command we want to run: opencode run --model <model> <context/task_info>
-    # We pass the string representation of ctx as it was in the original version.
     client = OpencodeClient()
     logger.debug("Executing Agent Command via client for task #%s", ctx.task_id)
+
+    # Construct a clean prompt for the agent with issue context if available
+    prompt_parts = [
+        f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repository {ctx.repo_full_name or ctx.repo_url} "
+        f"on branch '{ctx.branch_name or 'unknown'}'."
+    ]
+
+    if ctx.issue_title:
+        prompt_parts.append(f"\nISSUE TITLE: {ctx.issue_title}")
+    if ctx.issue_body:
+        prompt_parts.append(f"\nISSUE DESCRIPTION:\n{ctx.issue_body}")
+
+    prompt_parts.append(f"\nPREVIOUS TEST RUN FAILED (exit code: {ctx.exit_code}).")
+    prompt_parts.append(f"ERROR LOGS:\n{ctx.error_logs}")
+
+    prompt = "\n".join(prompt_parts)
 
     try:
         # We run the command in the workspace directory
         _, err = client.run(
-            str(ctx),
+            prompt,
             cwd=ctx.workspace_path,
             timeout=config.timeouts.opencode_run_timeout,
             truncate_lines=50,

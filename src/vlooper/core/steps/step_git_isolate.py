@@ -82,6 +82,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         # Update context
         ctx.workspace_path = repo_dir
         ctx.branch_name = branch_name
+        ctx.repo_full_name = full_name
         ctx.metadata["repo_full_name"] = full_name
 
         # Emit success event

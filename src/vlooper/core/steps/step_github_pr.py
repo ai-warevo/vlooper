@@ -22,12 +22,10 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         ctx.is_aborted = True
         return
 
-    # We need the repo full name to use github_client. 
-    # Assuming it was stored in metadata during isolation or can be reconstructed.
-    # For robustness, let's assume ctx.metadata["repo_full_name"] was set by git_isolate.
-    repo_full_name = ctx.metadata.get("repo_full_name") 
+    # Use repo_full_name directly from context if available, fallback to metadata
+    repo_full_name = ctx.repo_full_name or ctx.metadata.get("repo_full_name")
     if not repo_full_name:
-        logger.error("Cannot create PR: 'repo_full_name' not found in context metadata.")
+        logger.error("Cannot create PR: 'repo_full_name' not found in context.")
         ctx.is_aborted = True
         return
 
@@ -39,7 +37,15 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         commit_and_push(ctx.workspace_path, ctx.branch_name, commit_msg)
 
         # 2. Create Pull Request
-        pr_title, pr_body = generate_pr_metadata(ctx.workspace_path, ctx.issue_number, ctx.task_id)
+        logger.info("Using issue context from task for PR metadata...")
+        
+        pr_title, pr_body = generate_pr_metadata(
+            ctx.workspace_path, 
+            ctx.issue_number, 
+            ctx.task_id,
+            issue_title=ctx.issue_title,
+            issue_body=ctx.issue_body
+        )
         
         pr_details, err = create_pull_request_workflow(
             repo_full_name=repo_full_name,
@@ -50,7 +56,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         
         if err:
             raise Exception(f"GitHub CLI failed to create PR: {err}")
-
+        
         # Store PR details in context for later use (e.g., commenting)
         ctx.pr_details = pr_details  # type: ignore
 
