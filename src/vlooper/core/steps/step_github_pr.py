@@ -2,6 +2,7 @@ from ..framework.context import TaskContext
 from ..framework.types import StepFn
 from ..framework.events import EventName
 from vlooper.services.git_service import commit_and_push, quick_reset, cleanup_workspace
+from vlooper.services.ai_service import generate_commit_message
 from vlooper.services.github_service import create_pull_request_workflow
 from vlooper.infra.logger import get_logger
 
@@ -34,7 +35,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
 
     try:
         # 1. Commit and Push
-        commit_msg = f"fix: automated fix for issue #{ctx.issue_number}"
+        commit_msg = generate_commit_message(ctx.workspace_path, ctx.issue_number)
         commit_and_push(ctx.workspace_path, ctx.branch_name, commit_msg)
 
         # 2. Create Pull Request
