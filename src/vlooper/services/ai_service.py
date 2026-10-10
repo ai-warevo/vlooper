@@ -1,6 +1,7 @@
 """Service for AI-powered tasks like generating commit messages and Pull Request metadata."""
 
 import os
+from typing import Optional
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
 from vlooper.clients.git_client import has_uncommitted_changes, get_diff, get_default_branch
