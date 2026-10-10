@@ -89,7 +89,7 @@ def setup_branch(repo_dir, branch_name, task_type):
 
 
 def commit_and_push(repo_dir, branch_name, commit_msg):
-    """Commits changes and pushes the branch to origin using a rebase strategy."""
+    """Commits changes and pushes the branch to origin using a smart rebase strategy."""
     logger.info("💾 Committing changes...")
     logger.debug("Commit message: %s", commit_msg)
     commit_cmd = [
@@ -107,17 +107,25 @@ def commit_and_push(repo_dir, branch_name, commit_msg):
     if err:
         raise VLooperError(err)
 
-    # To avoid non-fast-forward errors, we attempt to rebase our work on top of the remote branch
-    logger.info("🔄 Attempting rebase with origin/%s to synchronize history...", branch_name)
-    rebase_cmd = ["git", "pull", "--rebase", "origin", branch_name]
-    logger.debug("Executing rebase command: %s", " ".join(rebase_cmd))
-    _, err = run_command(rebase_cmd, cwd=repo_dir, timeout=config.execution_timeout)
-    if err:
-        logger.error("❌ Rebase failed. This usually means there are merge conflicts that the AI cannot resolve automatically.")
-        raise VLooperError(f"Rebase failed/conflict detected: {err}")
+    # SMART STEP: Check if the branch already exists on remote before rebasing
+    logger.info("🔍 Checking if remote branch '%s' exists...", branch_name)
+    check_remote_cmd = ["git", "ls-remote", "--heads", "origin", branch_name]
+    stdout, err = run_command(check_remote_cmd, cwd=repo_dir)
+    
+    # If stdout is not empty and contains the branch name, it exists on remote
+    if stdout and branch_name in stdout:
+        logger.info("🔄 Remote branch found. Attempting rebase to synchronize history...")
+        rebase_cmd = ["git", "pull", "--rebase", "origin", branch_name]
+        logger.debug("Executing rebase command: %s", " ".join(rebase_cmd))
+        _, err = run_command(rebase_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+        if err:
+            logger.error("❌ Rebase failed. This usually means there are merge conflicts.")
+            raise VLooperError(f"Rebase failed/conflict detected: {err}")
+    else:
+        logger.info("ℹ️ Remote branch not found (this is likely the first push). Skipping rebase.")
 
     logger.info("📤 Pushing to origin...")
-    # Use force-with-lease as a safety measure after rebase
+    # Use force-with-lease as a safety measure after rebase or for new branches
     push_cmd = ["git", "push", "origin", branch_name, "--force-with-lease"]
     logger.debug("Executing push command: %s", " ".join(push_cmd))
     _, err = run_command(push_cmd, cwd=repo_dir, timeout=config.execution_timeout)
