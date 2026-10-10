@@ -5,6 +5,12 @@ import re
 import sys
 from pathlib import Path
 
+IGNORE_FILES = {
+    Path("src/analyze_unused.py"),
+    Path("src/check.py"),
+    Path("src/vlooper/__main__.py"),
+}
+
 
 def get_all_py_files(root_dir):
     """Find all Python files in the given directory, excluding common ignore directories."""
@@ -82,43 +88,34 @@ def get_used_env_vars(file_to_content):
 
 def find_unused_files(all_py_files, file_to_content, src_root):
     """Identify Python files that are not imported by any other file."""
-    mod_to_file = {}
-    for f in all_py_files:
-        if f.is_relative_to(src_root) and (mod_name := get_module_name(f, src_root)):
-            mod_to_file[mod_name] = f
-
-    # Files that are entry points but not imported anywhere else
-    ignore_files = {
-        Path("src/analyze_unused.py"),
-        Path("src/check.py"),
-        Path("src/vlooper/__main__.py"),
+    mod_to_file = {
+        get_module_name(f, src_root): f
+        for f in all_py_files
+        if f.is_relative_to(src_root) and get_module_name(f, src_root)
     }
-
-    # Alternatively, explicitly ignore functions used as entry points in pyproject.toml
-    # although this is a bit hard to maintain automatically without parsing pyproject.toml.
-    # For now, we just manually exclude common ones if they are reported.
 
     unused_files = []
     for mod, file_path in mod_to_file.items():
         if (
-            file_path.name == "__init__.py" 
-            or file_path in ignore_files 
+            file_path.name == "__init__.py"
+            or file_path in IGNORE_FILES
             or "tests/" in str(file_path)
         ):
             continue
 
         is_imported = False
-        file_name_no_ext = file_path.stem 
+        file_name_no_ext = file_path.stem
         pattern_full = r"\b" + re.escape(mod) + r"\b"
         pattern_file = r"\b" + re.escape(file_name_no_ext) + r"\b"
 
         for other_file, content in file_to_content.items():
             if other_file != file_path:
                 for line in content.splitlines():
-                    if line.strip().startswith(("import ", "from ")):
-                        if re.search(pattern_full, line) or re.search(pattern_file, line):
-                            is_imported = True
-                            break
+                    if line.strip().startswith(("import ", "from ")) and (
+                        re.search(pattern_full, line) or re.search(pattern_file, line)
+                    ):
+                        is_imported = True
+                        break
             if is_imported:
                 break
 
@@ -143,7 +140,7 @@ def find_unused_definitions(all_py_files, file_to_content):
         name, is_used = d["name"], False
         pattern = r"\b" + re.escape(name) + r"\b"
 
-        for other_file, content in file_to_content.items():
+        for content in file_to_content.values():
             lines = content.splitlines()
             for i, line in enumerate(lines):
                 if (
