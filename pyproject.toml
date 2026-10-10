@@ -11,7 +11,9 @@ dependencies = [
 ]
 
 [project.scripts]
-vlooper = "vlooper.daemon:main"
+vlooper = "vlooper.__main__:main"
+vlooper-tui = "vlooper.__main__:main_tui"
+vlooper-retry = "vlooper.__main__:main_retry"
 check = "check:main"
 
 [dependency-groups]
