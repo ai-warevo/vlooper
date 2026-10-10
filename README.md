@@ -42,30 +42,32 @@ export GH_TOKEN=your_bot_token_here
 ```
 
 ### 2. Running the Daemon
-To start the daemon (the engine that scans and processes tasks):
+To start the core engine that scans and processes tasks:
 
 ```sh
-# Run the core engine in a dedicated terminal
-uv run main.py
+vlooper
 ```
 
-**Advanced usage:**
-* `--retry-failed`: Instead of scanning GitHub for new tasks, the daemon will look for failed tasks in the local database and try to process them again. Useful after you've patched a bug that caused previous failures!
+*Alternatively, run from source:* `python -m vlooper`
+
+---
+
+### 🛠 Specialized Commands
+
+**Retry Failed Tasks**  
+Instead of scanning GitHub for new tasks, specifically targets failed tasks in the local database. Useful after you've patched a bug that caused previous failures!
 
 ```sh
-# Retry all FAILED tasks from the database
-uv run main.py --retry-failed
+vlooper-retry
 ```
 
-### 3. Monitoring (TUI Dashboard)
+**Monitoring (TUI Dashboard)**  
 To see what the agent is doing in real-time with a beautiful terminal interface, **open a second terminal** and run:
 
 ```sh
-# Launch the local TUI dashboard in another terminal
-uv run main.py --tui
+vlooper-tui
 ```
 *Note: The TUI is only a viewer. You must have the daemon running in a separate window to see any activity.*
-
 
 ---
 
