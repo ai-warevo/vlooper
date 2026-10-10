@@ -1,13 +1,15 @@
+import shlex
 import subprocess
 from ..framework.context import TaskContext
 from ..framework.events import EventName
+from vlooper.config import config
 from vlooper.infra.logger import get_logger
 
 logger = get_logger(__name__)
 
 def run_repository_tests(ctx: TaskContext) -> None:
     """
-    Executes the repository's local test harness using `./test.sh`.
+    Executes the repository's local test harness using the configured command.
     Captured results are written back to the TaskContext.
     Emits a 'harness:test_passed' event if tests pass.
     """
@@ -16,7 +18,7 @@ def run_repository_tests(ctx: TaskContext) -> None:
         ctx.is_aborted = True
         return
 
-    test_cmd = ["./test.sh"]
+    test_cmd = shlex.split(config.test_command)
     logger.info("🧪 Running repository tests in %s...", ctx.workspace_path)
 
     try:
