@@ -52,7 +52,7 @@ def commit(repo_dir, commit_msg):
         "-am",
         commit_msg,
     ]
-    _, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.execution_timeout)
+    _, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         raise VLooperError(f"Git commit failed: {err}")
     return True

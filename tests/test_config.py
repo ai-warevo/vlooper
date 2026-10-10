@@ -24,9 +24,9 @@ def test_config_defaults(monkeypatch):
     importlib.reload(config_module)
     c = config_module.config
 
-    assert c.org_name == "ai-warevo"
-    assert c.bot_username == "your_bot_login"
-    assert c.model == "ollama/gemma"
+    assert c.git.org_name == "ai-warevo"
+    assert c.git.bot_username == "your_bot_login"
+    assert c.model_cfg.model == "ollama/gemma"
 
 
 def test_config_env_override(monkeypatch):
@@ -38,6 +38,6 @@ def test_config_env_override(monkeypatch):
     importlib.reload(config_module)
     c = config_module.config
 
-    assert c.org_name == "custom-org"
-    assert c.bot_username == "tester"
-    assert c.max_task_retries == 5
+    assert c.git.org_name == "custom-org"
+    assert c.git.bot_username == "tester"
+    assert c.timeouts.max_task_retries == 5

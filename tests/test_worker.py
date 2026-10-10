@@ -226,7 +226,7 @@ def test_worker_deletes_branch_on_success_and_failure(
 
 
 def test_max_task_retries_respects_config(worker, db, monkeypatch, tmp_path):
-    """Verify that the number of attempts follows config.max_task_retries."""
+    """Verify that the number of attempts follows config.timeouts.max_task_retries."""
     # Set max_task_retries to 1 (meaning 2 total attempts: 1 initial + 1 retry)
     monkeypatch.setattr(config.timeouts, "max_task_retries", 1)
     monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))
@@ -271,7 +271,7 @@ def test_max_task_retries_respects_config(worker, db, monkeypatch, tmp_path):
 
 
 def test_max_task_retries_different_config(worker, db, monkeypatch, tmp_path):
-    """Verify that changing config.max_task_retries changes the number of attempts."""
+    """Verify that changing config.timeouts.max_task_retries changes the number of attempts."""
     # Set max_task_retries to 0 (meaning 1 total attempt: just the initial one)
     monkeypatch.setattr(config.timeouts, "max_task_retries", 0)
     monkeypatch.setattr(config.infra, "workspace_base_dir", str(tmp_path / "workspace"))

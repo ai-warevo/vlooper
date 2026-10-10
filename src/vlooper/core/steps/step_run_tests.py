@@ -18,7 +18,7 @@ def run_repository_tests(ctx: TaskContext) -> None:
         ctx.is_aborted = True
         return
 
-    test_cmd = shlex.split(config.test_command)
+    test_cmd = shlex.split(config.infra.test_command)
     logger.info("🧪 Running repository tests in %s...", ctx.workspace_path)
 
     try:

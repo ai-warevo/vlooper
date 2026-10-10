@@ -33,7 +33,7 @@ def apply_ai_fix(ctx: TaskContext) -> None:
 
     # The command we want to run: opencode run --model <model> <context/task_info>
     # We pass the string representation of ctx as it was in the original version.
-    opencode_cmd = ["opencode", "run", "--model", config.model, str(ctx)]
+    opencode_cmd = ["opencode", "run", "--model", config.model_cfg.model, str(ctx)]
     
     logger.debug("Executing Agent Command: %s", " ".join(opencode_cmd))
 
@@ -42,7 +42,7 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         _, err = run_command(
             opencode_cmd,
             cwd=ctx.workspace_path,
-            timeout=config.opencode_run_timeout,
+            timeout=config.timeouts.opencode_run_timeout,
             truncate_lines=50,
         )
 
