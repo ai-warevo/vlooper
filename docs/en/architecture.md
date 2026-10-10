@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**🇷🇺 Русский • [🇬🇧 English](../en/architecture.md)**
+**🇷🇺 Русский • [🇬🇧 English](../ru/architecture.md)**
 
 </div> 
 
