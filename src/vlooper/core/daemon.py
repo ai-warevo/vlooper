@@ -92,10 +92,10 @@ class VLooperDaemon:
             .use(RetryLimitMiddleware(max_pipeline_attempts=config.timeouts.max_pipeline_attempts)) # Controls test-fix retries
 
             # Execution Step Sequencing (Core Work)
-            .add_step(git_isolate_repository)        # 1. Setup workspace/branch
-            .add_step(run_repository_tests)          # 2. Run the harness
-            .add_step(apply_ai_fix)                  # 3. Fix if tests failed
-            .add_step(github_create_pull_request)    # 4. Push and PR
+            .add_step(git_isolate_repository, "Isolating repository")
+            .add_step(run_repository_tests, "Running tests")
+            .add_step(apply_ai_fix, "Applying AI fix")
+            .add_step(github_create_pull_request, "Creating pull request")
         )
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:

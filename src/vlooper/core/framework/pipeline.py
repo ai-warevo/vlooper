@@ -1,4 +1,4 @@
-from typing import List, Callable
+from typing import List, Callable, Optional
 from .context import TaskContext
 from .types import Middleware, StepFn, NextFn
 from .event_bus import EventBus
@@ -38,18 +38,23 @@ class TaskPipeline:
         self._middlewares.append(middleware)
         return self
 
-    def add_step(self, step: StepFn) -> "TaskPipeline":
+    def add_step(self, step: StepFn, description: Optional[str] = None) -> "TaskPipeline":
         """
         Adds an automation step to be executed sequentially in the pipeline core.
 
         Args:
             step: A callable representing a unit of work that takes a TaskContext.
-            
+            description: An optional human-readable description for this step.
+
         Returns:
             Self for method chaining.
         """
+        if description:
+            # Attach description to the function object so it can be retrieved during execution.
+            step._description = description  # type: ignore
         self._steps.append(step)
         return self
+
 
     def run(self, ctx: TaskContext) -> None:
         """
@@ -70,12 +75,15 @@ class TaskPipeline:
 
         # Define the core execution logic: iterate through all registered steps.
         def base_executor() -> None:
-            for step in self._steps:
+            for i, step in enumerate(self._steps):
                 if ctx.is_aborted:
                     break
-                
+
                 step_name = getattr(step, "__name__", "anonymous_step")
-                logger.info("➡️ [Step] Executing %s...", step_name)
+                # Use a custom description if available, otherwise fallback to the function name.
+                description = getattr(step, "_description", step_name)
+                logger.info("[step %d/%d] %s...", i + 1, len(self._steps), description)
+
                 try:
                     step(ctx)
                 except Exception as e:
