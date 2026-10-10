@@ -53,7 +53,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
             raise Exception(f"GitHub CLI failed to create PR: {err}")
 
         # Store PR details in context for later use (e.g., commenting)
-        ctx.pr_details = res  # type: ignore
+        ctx.pr_details = {"html_url": res.strip()}  # type: ignore
 
         logger.info("🚀 Pull Request created successfully!")
 
@@ -64,7 +64,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
                 "task_id": ctx.task_id,
                 "repo": repo_full_name,
                 "branch": ctx.branch_name,
-                "details": res
+                "details": ctx.pr_details
             })
 
     except Exception as e:
