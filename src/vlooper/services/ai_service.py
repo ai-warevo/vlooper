@@ -3,7 +3,7 @@
 import os
 from vlooper.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.clients.git_client import has_uncommitted_changes, get_diff
+from vlooper.clients.git_client import has_uncommitted_changes, get_diff, get_default_branch
 from vlooper.clients.opencode_client import OpencodeClient
 from vlooper.infra.logger import get_logger
 
@@ -73,6 +73,17 @@ def generate_pr_metadata(repo_dir: str, issue_number: int, task_id: str) -> tupl
     if err:
         logger.error("Failed to get git diff for PR generation: %s", err)
         return default_title, default_body
+
+    if not stdout or not stdout.strip():
+        # No uncommitted changes found; try getting the diff since divergence from the default branch
+        try:
+            default_branch = get_default_branch(repo_dir)
+            logger.info("No uncommitted changes found. Attempting to fetch diff since %s...", default_branch)
+            stdout, err = get_diff(repo_dir, base_branch=default_branch)
+            if err:
+                logger.warning("Failed to get divergence diff: %s", err)
+        except Exception as e:
+            logger.warning("Could not determine divergence diff (base branch error): %s", e)
 
     if not stdout or not stdout.strip():
         return default_title, default_body
