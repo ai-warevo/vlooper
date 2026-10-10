@@ -1,5 +1,6 @@
 """The main daemon process for vLooper."""
 
+import contextlib
 import fcntl
 import signal
 import sys
@@ -111,82 +112,98 @@ class VLooperDaemon:
             }
         )
 
-    def run(self, retry_failed: bool = False) -> None:
-        """
-        Main execution loop that polls for tasks and runs the pipeline.
-
-        Args:
-            retry_failed: If True, only poll for tasks marked as FAILED in the DB.
-        """
+    @contextlib.contextmanager
+    def _lock_context(self):
+        """Context manager to handle exclusive file locking."""
         logger.debug("Using lock file: %s", self.lock_file)
-
-        # Attempt to acquire an exclusive lock on the lock file
         with open(self.lock_file, "w", encoding="utf-8") as lock_fd:
             try:
                 logger.debug("Attempting to acquire file lock...")
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 logger.debug("Lock acquired successfully.")
+                yield lock_fd
             except OSError:
                 logger.error("❌ Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
-            logger.info(
-                "🚀 vLooper Daemon started with lock acquired. (Retry mode: %s)",
-                retry_failed,
-            )
+    def _get_next_task(self, retry_failed: bool) -> Optional[Dict[str, Any]]:
+        """Scans and retrieves the next available task."""
+        logger.debug("--- Starting iteration (scanning for tasks) ---")
+        self.scanner.scan(retry_failed=retry_failed)
 
-            while self.running:
-                try:
-                    # 1. Scan for new tasks (updates internal DB state/flags)
-                    logger.debug("--- Starting iteration (scanning for tasks) ---")
-                    self.scanner.scan(retry_failed=retry_failed)
+        if retry_failed:
+            logger.debug("Mode [Retry]: Querying failed tasks...")
+            tasks = self.db.get_failed_tasks()
+        else:
+            logger.debug("Mode [Normal]: Querying pending tasks...")
+            tasks = self.db.get_pending_tasks()
 
-                    # 2. Retrieve the next available task to process
-                    if retry_failed:
-                        logger.debug("Mode [Retry]: Querying failed tasks...")
-                        tasks = self.db.get_failed_tasks()
-                    else:
-                        logger.debug("Mode [Normal]: Querying pending tasks...")
-                        tasks = self.db.get_pending_tasks()
+        return tasks[0] if tasks else None
 
-                    task = None
-                    if tasks:
-                        task = tasks[0]
-                    
-                    if not task:
-                        logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.timeouts.loop_sleep_seconds)
-                        time.sleep(config.timeouts.loop_sleep_seconds)
-                        continue
+    def _process_task(self, task: Dict[str, Any]) -> None:
+        """Handles the end-to-end lifecycle of a single task."""
+        logger.info("🎯 Target identified: Task #%s (Type: %s, Repo: %s)", 
+                    task["id"], task["task_type"], task["repo_full_name"])
 
-                    # 3. Execute the Pipeline for the task
-                    logger.info("🎯 Target identified: Task #%s (Type: %s, Repo: %s)", task["id"], task["task_type"], task["repo_full_name"])
-                    
-                    # Mark as being processed in DB before running to prevent double-claiming
-                    logger.debug("Attempting to claim task #%s...", task["id"])
-                    if not self.db.claim_task(task["id"]):
-                        logger.debug("Task #%s already claimed or ineligible (max retries reached). Skipping.", task["id"])
-                        continue
+        # Mark as being processed in DB before running to prevent double-claiming
+        logger.debug("Attempting to claim task #%s...", task["id"])
+        if not self.db.claim_task(task["id"]):
+            logger.debug("Task #%s already claimed or ineligible (max retries reached). Skipping.", task["id"])
+            return
 
-                    logger.info("⚙️ Task #%s claimed successfully. Initializing pipeline context...", task["id"])
-                    ctx = self._map_task_to_context(task)
-                    
-                    logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
-                    self.pipeline.run(ctx)
+        logger.info("⚙️ Task #%s claimed successfully. Initializing pipeline context...", task["id"])
+        ctx = self._map_task_to_context(task)
 
-                    # 4. Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
-                    logger.info("🔔 Emitting '%s' event for Task #%s...", EventName.TASK_FINISHED, ctx.task_id)
-                    self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+        logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
+        self.pipeline.run(ctx)
 
-                    # Sleep between iterations
-                    logger.debug("Iteration complete. Sleeping...")
+        # Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
+        logger.info("🔔 Emitting '%s' event for Task #%s...", EventName.TASK_FINISHED, ctx.task_id)
+        self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+
+    def _execute_loop(self, retry_failed: bool) -> None:
+        """The main operational loop of the daemon."""
+        while self.running:
+            try:
+                task = self._get_next_task(retry_failed)
+
+                if not task:
+                    logger.debug("No active tasks found in this scan. Sleeping for %ss...", config.timeouts.loop_sleep_seconds)
                     time.sleep(config.timeouts.loop_sleep_seconds)
+                    continue
 
-                except Exception as e:
-                    logger.error("⚠️ Unexpected error in daemon loop: %s", e, exc_info=True)
-                    logger.debug("Sleeping for error recovery period (%ss)...", config.timeouts.error_wait_seconds)
-                    time.sleep(config.timeouts.error_wait_seconds)
+                self._process_task(task)
 
-        logger.info("👋 Daemon shut down.")
+                # Sleep between iterations
+                logger.debug("Iteration complete. Sleeping...")
+                time.sleep(config.timeouts.loop_sleep_seconds)
+
+            except Exception as e:
+                logger.error("⚠️ Unexpected error in daemon loop: %s", e, exc_info=True)
+                logger.debug("Sleeping for error recovery period (%ss)...", config.timeouts.error_wait_seconds)
+                time.sleep(config.timeouts.error_wait_seconds)
+
+    def run(self, retry_failed: bool = False) -> None:
+        """
+        Main execution loop that orchestrates task scanning and processing.
+
+        Args:
+            retry_failed: If True, only poll for tasks marked as FAILED in the DB.
+        """
+        try:
+            with self._lock_context():
+                logger.info(
+                    "🚀 vLooper Daemon started with lock acquired. (Retry mode: %s)",
+                    retry_failed,
+                )
+
+                self._execute_loop(retry_failed)
+                logger.info("👋 Daemon shut down.")
+
+        except SystemExit:
+            raise
+        except Exception as e:
+            logger.error("❌ Fatal error in daemon: %s", e, exc_info=True)
 
 
 def main(retry_failed: bool = False) -> None:
