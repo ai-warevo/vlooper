@@ -17,7 +17,7 @@ class GitHubNotificationHandler:
 
         # Ensure we have the necessary info to identify the issue/PR
         if not task_data["repo_full_name"] or not task_data["branch_name"]:
-            logger.warning("⚠️ Cannot post GitHub comment: missing repo_full_name or branch_name in context.")
+            logger.warning("Cannot post GitHub comment: missing repo_full_name or branch_name in context.")
             return
 
         try:
@@ -27,21 +27,21 @@ class GitHubNotificationHandler:
 
             if ctx.exit_code == 0:
                 # Successful completion
-                message = f"{mention}✅ **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
+                message = f"{mention} **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
                 if hasattr(ctx, 'pr_details') and ctx.pr_details:
                      url = ctx.pr_details.get('html_url', '')
                      if url:
-                         message += f"\n\n🔗 **Pull Request:** {url}"
+                         message += f"\n\n**Pull Request:** {url}"
                 
-                logger.info("💬 Posting success comment to GitHub...")
+                logger.info("Posting success comment to GitHub...")
                 post_github_comment(task_data, message)
             else:
                 # Failure (either aborted or exit code != 0)
                 error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
-                message = f"{mention}❌ **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
+                message = f"{mention} **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
                 
-                logger.info("💬 Posting failure comment to GitHub...")
+                logger.info("Posting failure comment to GitHub...")
                 post_github_comment(task_data, message)
 
         except Exception as e:
-            logger.error("❌ Failed to post completion comment to GitHub: %s", e)
+            logger.error("Failed to post completion comment to GitHub: %s", e)

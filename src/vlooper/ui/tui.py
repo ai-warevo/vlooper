@@ -60,10 +60,10 @@ class VLooperTUI(App):
             active = self.db.get_active_claimed_task()
             if active:
                 status_text = (
-                    f"🚀 WORKING ON: #{active['id']} ({active['repo_full_name']})"
+                    f"WORKING ON: #{active['id']} ({active['repo_full_name']})"
                 )
             else:
-                status_text = "💤 IDLE - Waiting for tasks..."
+                status_text = "IDLE - Waiting for tasks..."
 
             if self.status_label:
                 self.status_label.update(status_text)
@@ -85,7 +85,7 @@ class VLooperTUI(App):
                     )
         except Exception as e:  # noqa: W0718
             if self.status_label:
-                self.status_label.update(f"⚠️ Error loading data: {e}")
+                self.status_label.update(f"Error loading data: {e}")
 
     async def action_quit(self) -> None:
         """Handle the quit action."""

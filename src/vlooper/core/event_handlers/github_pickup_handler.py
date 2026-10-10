@@ -11,7 +11,7 @@ class GitHubPickupHandler:
         # Extract original task data from context
         task = ctx.metadata.get("original_task")
         if not task:
-            logger.warning("⚠️ Cannot post pickup comment: no original task in context.")
+            logger.warning("Cannot post pickup comment: no original task in context.")
             return
 
         try:
@@ -28,10 +28,10 @@ class GitHubPickupHandler:
             author = get_github_author(task_data)
             mention = f"@{author} " if author and author != "assignee" else ""
             
-            message = f"{mention}🤖 **vLooper has picked up this task.**"
+            message = f"{mention} **vLooper has picked up this task.**"
 
-            logger.info("💬 Posting pickup comment to GitHub...")
+            logger.info("Posting pickup comment to GitHub...")
             post_github_comment(task_data, message)
 
         except Exception as e:
-            logger.error("❌ Failed to post pickup comment to GitHub: %s", e)
+            logger.error("Failed to post pickup comment to GitHub: %s", e)

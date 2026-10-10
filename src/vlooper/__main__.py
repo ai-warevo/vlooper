@@ -26,7 +26,7 @@ def main(argv=None):
 
     if args.tui:
         if VLooperTUI is None:
-            logger.error("❌ TUI module not found.")
+            logger.error("TUI module not found.")
             sys.exit(1)
         app = VLooperTUI()
         app.run()
@@ -34,7 +34,7 @@ def main(argv=None):
 
     # Standard Daemon execution
     if "GH_TOKEN" not in os.environ:
-        logger.warning("⚠️ Warning: GH_TOKEN is not set. Some GitHub operations might fail.")
+        logger.warning("Warning: GH_TOKEN is not set. Some GitHub operations might fail.")
     
     daemon = VLooperDaemon()
     daemon.run(retry_failed=args.retry_failed)

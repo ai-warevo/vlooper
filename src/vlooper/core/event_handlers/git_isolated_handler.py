@@ -9,4 +9,4 @@ class GitIsolatedHandler:
         task_id = ctx_data.get("task_id")
         repo = ctx_data.get("repo")
         branch = ctx_data.get("branch")
-        logger.info("[Telemetry] 🛠️ Task #%s: Repository isolated on branch %s (%s)", task_id, branch, repo)
+        logger.info("[Telemetry] Task #%s: Repository isolated on branch %s (%s)", task_id, branch, repo)

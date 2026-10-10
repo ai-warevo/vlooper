@@ -21,10 +21,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
         if retry_failed:
-            logger.info("🔄 Mode: Retrying stale failed tasks (5m cooldown)...")
+            logger.info("Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
 
-        logger.info("🔍 Scanning for new tasks in organization: %s...", config.git.org_name)
+        logger.info("Scanning for new tasks in organization: %s...", config.git.org_name)
         self._scan_issues()
         self._scan_prs()
 
@@ -39,12 +39,12 @@ class Scanner:  # pylint: disable=too-few-public-methods
             return
 
         logger.info(
-            "♻️ Found %s stale failed tasks. Resetting them...", len(failed_tasks)
+            "Found %s stale failed tasks. Resetting them...", len(failed_tasks)
         )
         for task in failed_tasks:
             logger.debug("Resetting task #%s to PENDING.", task["id"])
             self.db.reset_task_status(task["id"])
-            logger.info("   ✅ Task #%s reset to PENDING.", task["id"])
+            logger.info("Task #%s reset to PENDING.", task["id"])
 
     def _scan_issues(self):
         """Scan for open issues assigned to the bot."""

@@ -14,12 +14,12 @@ def run_repository_tests(ctx: TaskContext) -> None:
     Emits a 'harness:test_passed' event if tests pass.
     """
     if not ctx.workspace_path:
-        logger.error("❌ Cannot run tests: ctx.workspace_path is not set.")
+        logger.error("Cannot run tests: ctx.workspace_path is not set.")
         ctx.is_aborted = True
         return
 
     test_cmd = shlex.split(config.infra.test_command)
-    logger.info("🧪 Running repository tests in %s...", ctx.workspace_path)
+    logger.info("Running repository tests in %s...", ctx.workspace_path)
 
     try:
         result = subprocess.run(
@@ -34,17 +34,17 @@ def run_repository_tests(ctx: TaskContext) -> None:
         ctx.error_logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
 
         if ctx.exit_code == 0:
-            logger.info("✅ Tests passed successfully.")
+            logger.info("Tests passed successfully.")
             # Retrieve EventBus from context metadata to emit event
             event_bus = ctx.metadata.get("event_bus")
             if event_bus:
                 event_bus.emit(EventName.HARNESS_TEST_PASSED, {"task_id": ctx.task_id})
         else:
-            logger.warning("❌ Tests failed with exit code %d.", ctx.exit_code)
+            logger.warning("Tests failed with exit code %d.", ctx.exit_code)
             logger.error("--- TEST FAILURE DETAILS ---\n%s\n-----------------------------", ctx.error_logs)
 
     except Exception as e:
-        logger.exception("🚨 Critical error while running test harness: %s", e)
+        logger.exception("Critical error while running test harness: %s", e)
         ctx.exit_code = -1
         ctx.error_logs = str(e)
         ctx.is_aborted = True

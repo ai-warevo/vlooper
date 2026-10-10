@@ -87,7 +87,7 @@ class TaskPipeline:
                 try:
                     step(ctx)
                 except Exception as e:
-                    logger.error("❌ [Step] Error in %s: %s", step_name, e, exc_info=True)
+                    logger.error("[Step] Error in %s: %s", step_name, e, exc_info=True)
                     raise e
 
         # The 'current_next' starts pointing to the base executor (the innermost part of the onion).

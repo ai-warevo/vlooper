@@ -14,11 +14,11 @@ def github_create_pull_request(ctx: TaskContext) -> None:
     Only executes if tests have passed (ctx.exit_code == 0).
     """
     if ctx.exit_code != 0:
-        logger.info("⏭️ Skipping PR creation; tests failed or not run.")
+        logger.info("Skipping PR creation; tests failed or not run.")
         return
 
     if not ctx.workspace_path or not ctx.branch_name:
-        logger.error("❌ Cannot create PR: workspace_path or branch_name is missing from context.")
+        logger.error("Cannot create PR: workspace_path or branch_name is missing from context.")
         ctx.is_aborted = True
         return
 
@@ -27,11 +27,11 @@ def github_create_pull_request(ctx: TaskContext) -> None:
     # For robustness, let's assume ctx.metadata["repo_full_name"] was set by git_isolate.
     repo_full_name = ctx.metadata.get("repo_full_name") 
     if not repo_full_name:
-        logger.error("❌ Cannot create PR: 'repo_full_name' not found in context metadata.")
+        logger.error("Cannot create PR: 'repo_full_name' not found in context metadata.")
         ctx.is_aborted = True
         return
 
-    logger.info("📦 Preparing Pull Request for %s on branch %s...", repo_full_name, ctx.branch_name)
+    logger.info(" Preparing Pull Request for %s on branch %s...", repo_full_name, ctx.branch_name)
 
     try:
         # 1. Commit and Push
@@ -54,7 +54,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         # Store PR details in context for later use (e.g., commenting)
         ctx.pr_details = pr_details  # type: ignore
 
-        logger.info("🚀 Pull Request created successfully!")
+        logger.info("Pull Request created successfully!")
 
         # 3. Emit success event
         event_bus = ctx.metadata.get("event_bus")
@@ -70,7 +70,7 @@ def github_create_pull_request(ctx: TaskContext) -> None:
         cleanup_workspace(ctx.workspace_path, ctx.branch_name)
 
     except Exception as e:
-        logger.exception("❌ Failed to complete GitHub Pull Request workflow: %s", e)
+        logger.exception("Failed to complete GitHub Pull Request workflow: %s", e)
         # Cleanup on failure: stash changes and return to main/master
         quick_reset(ctx.workspace_path)
         raise e

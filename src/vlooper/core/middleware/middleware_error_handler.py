@@ -16,7 +16,7 @@ class GlobalExceptionHandlerMiddleware:
         try:
             next_fn()
         except Exception as e:
-            logger.exception("🚨 Uncaught exception detected at the top-level pipeline boundary: %s", e)
+            logger.exception("Uncaught exception detected at the top-level pipeline boundary: %s", e)
             ctx.is_aborted = True
             ctx.error = e
             if ctx.workspace_path and ctx.branch_name:

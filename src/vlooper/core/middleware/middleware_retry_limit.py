@@ -24,7 +24,7 @@ class RetryLimitMiddleware:
             attempt_count += 1
             ctx.metadata["attempt_count"] = attempt_count
             
-            logger.info("🔄 Attempt %d of %d starting...", attempt_count, self._max_pipeline_attempts)
+            logger.info("Attempt %d of %d starting...", attempt_count, self._max_pipeline_attempts)
             
             # Execute the next layer in the onion (could be more middleware or steps).
             next_fn()
@@ -32,17 +32,17 @@ class RetryLimitMiddleware:
             # Check if we reached a successful state.
             # We define success as tests passing (exit_code == 0).
             if ctx.exit_code == 0:
-                logger.info("✅ Automation cycle succeeded on attempt %d.", attempt_count)
+                logger.info("Automation cycle succeeded on attempt %d.", attempt_count)
                 return
 
             # If the loop continues, we might be fixing things in the next step.
             # We only abort if this was our LAST allowed attempt and it still failed.
             if attempt_count >= self._max_pipeline_attempts:
                 logger.error(
-                    "🚨 Maximum attempts (%d) reached without successful test pass. Aborting.",
+                    "Maximum attempts (%d) reached without successful test pass. Aborting.",
                     self._max_pipeline_attempts
                 )
                 ctx.is_aborted = True
                 return
 
-            logger.warning("⚠️ Attempt %d failed. Proceeding to next step in pipeline (e.g., Fix).", attempt_count)
+            logger.warning("Attempt %d failed. Proceeding to next step in pipeline (e.g., Fix).", attempt_count)

@@ -7,7 +7,7 @@ from vlooper.infra.utils import run_command
 
 def clone_repository(repo_full_name, repo_short_name, base_dir):
     """Clone a repository using GitHub CLI."""
-    print(f"📦 Cloning repository {repo_full_name}...")
+    print(f"Cloning repository {repo_full_name}...")
     cmd = ["gh", "repo", "clone", repo_full_name, repo_short_name]
     res, err = run_command(cmd, cwd=base_dir)
     if err:

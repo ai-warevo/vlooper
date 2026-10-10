@@ -55,7 +55,7 @@ def pull(repo_dir, remote="origin", branch=None, rebase=False):
 
 def commit(repo_dir, commit_msg):
     """Commit changes with configured user info."""
-    logger.info("💾 Committing changes...")
+    logger.info("Committing changes...")
     commit_cmd = [
         "git",
         "-c", f"user.name={config.git.git_user_name}",
@@ -67,7 +67,7 @@ def commit(repo_dir, commit_msg):
     stdout, err = run_command(commit_cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         if "nothing to commit" in err or "working tree clean" in err:
-            logger.info("ℹ️ Nothing to commit (working tree is clean).")
+            logger.info("Nothing to commit (working tree is clean).")
             return True
         raise VLooperError(f"Git commit failed: {err}")
     return True
@@ -79,7 +79,7 @@ def push(repo_dir, branch, force_with_lease=True):
     if force_with_lease:
         cmd.append("--force-with-lease")
 
-    logger.info("📤 Pushing %s to origin...", branch)
+    logger.info("Pushing %s to origin...", branch)
     _, err = run_command(cmd, cwd=repo_dir, timeout=config.timeouts.execution_timeout)
     if err:
         raise VLooperError(f"Git push failed: {err}")
@@ -143,7 +143,7 @@ def has_uncommitted_changes(repo_dir):
 
 def add_all(repo_dir):
     """Stage all changes (including untracked ones)."""
-    logger.info("📥 Staging all changes...")
+    logger.info("Staging all changes...")
     _, err = run_command(["git", "add", "-A"], cwd=repo_dir)
     if err:
         raise VLooperError(f"Git add -A failed: {err}")

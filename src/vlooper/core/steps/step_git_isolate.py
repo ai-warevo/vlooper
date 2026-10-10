@@ -44,7 +44,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
     """
     # Identify task type from original record
     task_type = ctx.metadata["original_task"]["task_type"]
-    logger.info("🚀 Isolating repository for %s #%s...", task_type.lower(), ctx.issue_number)
+    logger.info("Isolating repository for %s #%s...", task_type.lower(), ctx.issue_number)
 
     try:
         full_name, short_name = _parse_repo_info(ctx.repo_url)
@@ -68,7 +68,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
 
         # 1. Clone and/or prepare directory
         if not os.path.exists(repo_dir):
-            logger.info("📥 Cloning repository %s into %s...", full_name, repo_dir)
+            logger.info("Cloning repository %s into %s...", full_name, repo_dir)
             success, err = clone_repository_workflow(full_name, short_name, base_dir)
             if not success:
                 raise VLooperError(f"Failed to clone repository: {err}")
@@ -94,8 +94,8 @@ def git_isolate_repository(ctx: TaskContext) -> None:
                 "workspace": repo_dir
             })
         
-        logger.info("✅ Repository isolated at %s on branch %s (Attempt: %d)", repo_dir, branch_name, attempt_count)
+        logger.info("Repository isolated at %s on branch %s (Attempt: %d)", repo_dir, branch_name, attempt_count)
 
     except Exception as e:
-        logger.exception("❌ Failed to isolate repository: %s", e)
+        logger.exception("Failed to isolate repository: %s", e)
         raise e

@@ -17,11 +17,11 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         return
 
     if not ctx.workspace_path:
-        logger.error("❌ Cannot apply fix: ctx.workspace_path is not set.")
+        logger.error("Cannot apply fix: ctx.workspace_path is not set.")
         ctx.is_aborted = True
         return
 
-    logger.info("🤖 Attempting to apply AI-driven fix for task #%s...", ctx.task_id)
+    logger.info("Attempting to apply AI-driven fix for task #%s...", ctx.task_id)
 
     # Emit event before invocation
     event_bus = ctx.metadata.get("event_bus")
@@ -29,7 +29,7 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         event_bus.emit(EventName.HARNESS_FIXING_CODE, {"task_id": ctx.task_id})
 
     if not ctx.error_logs:
-        logger.warning("⚠️ Tests failed but no error logs were found in context.")
+        logger.warning("Tests failed but no error logs were found in context.")
         return
 
     # The command we want to run: opencode run --model <model> <context/task_info>
@@ -49,13 +49,13 @@ def apply_ai_fix(ctx: TaskContext) -> None:
         if err:
             # We don't necessarily want to abort the whole pipeline if the agent fails once, 
             # as the retry middleware might handle it. However, we log it clearly.
-            logger.error("❌ Opencode agent failed to apply fix: %s", err)
+            logger.error("Opencode agent failed to apply fix: %s", err)
             # If the agent itself crashes or cannot run, it's a hard failure for this attempt.
         else:
-            logger.info("✅ AI agent has successfully completed the execution.")
+            logger.info("AI agent has successfully completed the execution.")
             # Note: We do NOT change ctx.exit_code here. 
             # The next step/retry loop will RUN TESTS AGAIN to verify if the fix worked.
 
     except Exception as e:
-        logger.exception("🚨 Critical error while running Opencode agent: %s", e)
+        logger.exception("Critical error while running Opencode agent: %s", e)
         raise e

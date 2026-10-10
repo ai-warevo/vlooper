@@ -9,4 +9,4 @@ class PrCreatedHandler:
         task_id = ctx_data.get("task_id")
         repo = ctx_data.get("repo")
         branch = ctx_data.get("branch")
-        logger.info("[Telemetry] 🚀 Task #%s: Pull Request created on %s (%s)", task_id, repo, branch)
+        logger.info("[Telemetry] Task #%s: Pull Request created on %s (%s)", task_id, repo, branch)

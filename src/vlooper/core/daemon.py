@@ -92,15 +92,15 @@ class VLooperDaemon:
             .use(RetryLimitMiddleware(max_pipeline_attempts=config.timeouts.max_pipeline_attempts)) # Controls test-fix retries
 
             # Execution Step Sequencing (Core Work)
-            .add_step(git_isolate_repository, "Isolating repository")
-            .add_step(run_repository_tests, "Running tests")
-            .add_step(apply_ai_fix, "Applying AI fix")
-            .add_step(github_create_pull_request, "Creating pull request")
+            .add_step(git_isolate_repository, "📂 Isolating repository")
+            .add_step(run_repository_tests, "🧪 Running tests")
+            .add_step(apply_ai_fix, "🤖 Applying AI fix")
+            .add_step(github_create_pull_request, "🚀 Creating pull request")
         )
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
-        logger.info("\n🛑 Stopping daemon...")
+        logger.info("\nStopping daemon...")
         self.running = False
 
     def _map_task_to_context(self, task: Dict[str, Any]) -> TaskContext:
@@ -126,7 +126,7 @@ class VLooperDaemon:
                 logger.debug("Lock acquired successfully.")
                 yield lock_fd
             except OSError:
-                logger.error("❌ Another instance of vLooper is already running. Exiting.")
+                logger.error("Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
     def _get_next_task(self, retry_failed: bool) -> Optional[Dict[str, Any]]:
@@ -145,7 +145,7 @@ class VLooperDaemon:
 
     def _process_task(self, task: Dict[str, Any]) -> None:
         """Handles the end-to-end lifecycle of a single task."""
-        logger.info("🎯 Target identified: Task #%s (Type: %s, Repo: %s)", 
+        logger.info("Target identified: Task #%s (Type: %s, Repo: %s)", 
                     task["id"], task["task_type"], task["repo_full_name"])
 
         # Mark as being processed in DB before running to prevent double-claiming
@@ -154,13 +154,13 @@ class VLooperDaemon:
             logger.debug("Task #%s already claimed or ineligible (max retries reached). Skipping.", task["id"])
             return
 
-        logger.info("⚙️ Task #%s claimed successfully. Initializing pipeline context...", task["id"])
+        logger.info("Task #%s claimed successfully. Initializing pipeline context...", task["id"])
         ctx = self._map_task_to_context(task)
 
         # Emit pickup event to notify GitHub that the agent is working on it
         self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
 
-        logger.info("🔥 Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
+        logger.info("Executing pipeline for Task #%s (Issue #%s)...", ctx.task_id, ctx.issue_number)
         self.pipeline.run(ctx)
 
         # Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
@@ -184,31 +184,31 @@ class VLooperDaemon:
                 time.sleep(config.timeouts.loop_sleep_seconds)
 
             except Exception as e:
-                logger.error("⚠️ Unexpected error in daemon loop: %s", e, exc_info=True)
+                logger.error("Unexpected error in daemon loop: %s", e, exc_info=True)
                 logger.debug("Sleeping for error recovery period (%ss)...", config.timeouts.error_wait_seconds)
                 time.sleep(config.timeouts.error_wait_seconds)
 
     def run(self, retry_failed: bool = False) -> None:
         """
         Main execution loop that orchestrates task scanning and processing.
-
+ 
         Args:
             retry_failed: If True, only poll for tasks marked as FAILED in the DB.
         """
         try:
             with self._lock_context():
                 logger.info(
-                    "🚀 vLooper Daemon started with lock acquired. (Retry mode: %s)",
+                    "vLooper Daemon started with lock acquired. (Retry mode: %s)",
                     retry_failed,
                 )
-
+ 
                 self._execute_loop(retry_failed)
-                logger.info("👋 Daemon shut down.")
-
+                logger.info("Daemon shut down.")
+ 
         except SystemExit:
             raise
         except Exception as e:
-            logger.error("❌ Fatal error in daemon: %s", e, exc_info=True)
+            logger.error("Fatal error in daemon: %s", e, exc_info=True)
 
 
 def main(retry_failed: bool = False) -> None:
