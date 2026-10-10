@@ -24,7 +24,7 @@ from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_run_tests import run_repository_tests
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
 from vlooper.core.steps.step_github_pr import github_create_pull_request
-from vlooper.services.github_service import post_github_comment
+from vlooper.services.github_service import post_github_comment, get_github_author
 
 logger = get_logger(__name__)
 
@@ -123,9 +123,13 @@ class VLooperDaemon:
             return
 
         try:
+            # Fetch author to mention them
+            author = get_github_author(task_data)
+            mention = f"@{author} " if author and author != "assignee" else ""
+
             if ctx.exit_code == 0:
                 # Successful completion
-                message = "✅ **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
+                message = f"{mention}✅ **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
                 if hasattr(ctx, 'pr_details') and ctx.pr_details:
                      url = ctx.pr_details.get('html_url', '')
                      if url:
@@ -136,7 +140,7 @@ class VLooperDaemon:
             else:
                 # Failure (either aborted or exit code != 0)
                 error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
-                message = f"❌ **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
+                message = f"{mention}❌ **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
                 
                 logger.info("💬 Posting failure comment to GitHub...")
                 post_github_comment(task_data, message)
