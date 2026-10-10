@@ -145,18 +145,6 @@ updated_at = CURRENT_TIMESTAMP
                 )
             conn.commit()
 
-    def is_task_at_max_task_retries(self, task_id) -> bool:
-        """Check if the task has exhausted all retries."""
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                "SELECT status, retries FROM tasks WHERE id = ?", (task_id,)
-            )
-            row = cursor.fetchone()
-            if row and row["status"] == "FAILED":
-                return row["retries"] >= config.max_task_retries
-        return False
-
     def get_active_claimed_task(self):
         """Get the currently active claimed task."""
         with self._get_connection() as conn:

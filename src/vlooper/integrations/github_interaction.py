@@ -65,66 +65,6 @@ def get_github_author(task):
                 return stdout
     return "assignee"
 
-
-def create_pr(repo_full_name, repo_dir, branch_name):
-    """Creates a Pull Request."""
-    logger.info("Creating Pull Request...")
-    _, err = create_pull_request(
-        repo_full_name,
-        f"Fix for {branch_name}",
-        "Automated fix by vLooper agent.",
-        cwd=repo_dir,
-        timeout=config.execution_timeout,
-    )
-    if err:
-        raise VLooperError(err)
-
-    details = get_pr_details(repo_full_name, branch_name)
-    if details:
-        return details[0]
-    return None
-
-
-def get_issue_context(task, repo_full_name):
-    """Fetch context for the task from GitHub."""
-    num = (
-        task["branch_name"].split("-")[-1] if "-" in task["branch_name"] else "unknown"
-    )
-    if num == "unknown":
-        return None
-
-    details = get_issue_details(num, repo_full_name)
-    if not details:
-        return None
-    title, body, comments_text = details
-
-    return (
-        f"ISSUE #{num} on repo {repo_full_name}: {title}\n"
-        f"Description:\n{body}\n\nHistory:\n{comments_text}"
-    )
-
-
-def get_pr_context(task, repo_full_name):
-    """Fetch context for the task from a Pull Request on GitHub."""
-    try:
-        details = get_pr_details(repo_full_name, task["branch_name"])
-        if not details:
-            return None
-
-        num, _, body, review_text = details
-
-        if "Fixed by bot" in review_text:
-            return None
-
-        return (
-            f"Fix for PR #{num} on repo "
-            f"{repo_full_name} (branch {task['branch_name']}).\nRequested changes:\n"
-            f"{review_text}\n\nPR Description:\n{body}"
-        )
-    except Exception:  # noqa: W0718
-        return None
-
-
 def get_issue_number(task):
     """Get issue number from task."""
     if task["task_type"] == "ISSUE":
