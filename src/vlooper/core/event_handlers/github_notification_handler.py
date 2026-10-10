@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from typing import Any
 
 from vlooper.infra.logger import get_logger
@@ -32,7 +34,11 @@ class GitHubNotificationHandler:
 
             if ctx.exit_code == 0:
                 # Successful completion
-                message = f"{mention} **vLooper Automation Complete!**\n\nThe automated fix has been applied and a Pull Request has been created."
+                message = (
+                    f"{mention} **vLooper Automation Complete!**\n\n"
+                    "The automated fix has been applied and a Pull Request "
+                    "has been created."
+                )
                 if hasattr(ctx, "pr_details") and ctx.pr_details:
                     url = ctx.pr_details.get("html_url", "")
                     if url:
@@ -47,7 +53,11 @@ class GitHubNotificationHandler:
                     if ctx.error
                     else f"Pipeline failed with exit code {ctx.exit_code}"
                 )
-                message = f"{mention} **vLooper Automation Failed**\n\nAn error occurred during the automated cycle:\n`{error_msg}`"
+                message = (
+                    f"{mention} **vLooper Automation Failed**\n\n"
+                    "An error occurred during the automated cycle:\n"
+                    f"`{error_msg}`"
+                )
 
                 logger.info("Posting failure comment to GitHub...")
                 post_github_comment(task_data, message)

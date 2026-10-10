@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 import os
 
 from vlooper.config import config
@@ -29,14 +31,13 @@ def _parse_repo_info(url: str) -> tuple[str, str]:
             full_name = f"{parts[3]}/{parts[4]}"
             short_name = parts[4]
             return full_name, short_name
-        else:
-            raise VLooperError(f"Could not parse repository info from URL: {url}")
-    else:
-        # It's already in 'owner/repo' format
-        parts = clean_url.split("/")
-        if len(parts) == 2:
-            return clean_url, parts[1]
-        raise VLooperError(f"Could not parse repository info from: {url}")
+        raise VLooperError(f"Could not parse repository info from URL: {url}")
+
+    # It's already in 'owner/repo' format
+    parts = clean_url.split("/")
+    if len(parts) == 2:
+        return clean_url, parts[1]
+    raise VLooperError(f"Could not parse repository info from: {url}")
 
 
 def git_isolate_repository(ctx: TaskContext) -> None:
@@ -59,7 +60,7 @@ def git_isolate_repository(ctx: TaskContext) -> None:
         if task_type == "ISSUE":
             branch_name = f"vlooper/fix-{ctx.issue_number}"
         else:
-            branch_name = ctx.branch_name
+            branch_name = ctx.branch_name or ""
 
         # Determine if we should skip reset (for retry attempts)
         attempt_count = ctx.metadata.get("attempt_count", 0)

@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from vlooper.persistence.migrations.base import Migration
 
 

@@ -33,7 +33,8 @@ class Database:
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, branch_name, status)
+                INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, 
+                                   branch_name, status)
                 VALUES (?, ?, ?, ?, ?, 'PENDING')
             """,
                 (task_type, repo_full_name, repo_url, issue_number, branch_name),

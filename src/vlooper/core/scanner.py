@@ -152,5 +152,4 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 logger.warning("Could not find headRefName for PR #%s.", num)
                 return None
             return branch
-        else:
-            return f"issue-{num}"
+        return f"issue-{num}"

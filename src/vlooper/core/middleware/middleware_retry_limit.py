@@ -1,3 +1,5 @@
+"""Module docstring."""
+
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 

@@ -124,6 +124,7 @@ class VLooperDaemon:
                 int(task["issue_number"]) if task["issue_number"] is not None else 0
             ),
             repo_url=str(task["repo_url"]),
+            workspace_path=str(task.get("workspace_path", ".")),
             metadata={
                 "event_bus": self.event_bus,  # Required for steps to emit events
                 "original_task": task,  # Preserve original record if needed
@@ -240,8 +241,6 @@ class VLooperDaemon:
                 self._execute_loop(retry_failed)
                 logger.info("Daemon shut down.")
 
-        except SystemExit:
-            raise
         except Exception:
             logger.exception("Fatal error in daemon")
 

@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -38,5 +40,5 @@ class EventBus:
             except Exception:
                 # Critical: Prevent subscriber failures from crashing the core pipeline.
                 logger.exception(
-                    f"Error in EventBus subscriber for event '{event_name}'"
+                    "Error in EventBus subscriber for event '%s'", event_name
                 )

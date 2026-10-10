@@ -1,3 +1,5 @@
+"""Module docstring."""
+
 from vlooper.infra.logger import get_logger
 from vlooper.services.ai_service import generate_commit_message, generate_pr_metadata
 from vlooper.services.git_service import cleanup_workspace, commit_and_push, quick_reset

@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from collections.abc import Callable
 
 from vlooper.infra.logger import get_logger
@@ -26,6 +28,7 @@ class TaskPipeline:
         self._event_bus = event_bus
         self._middlewares: list[Middleware] = []
         self._steps: list[StepFn] = []
+        self._step_descriptions: dict[int, str] = {}
 
     def use(self, middleware: Middleware) -> "TaskPipeline":
         """
@@ -53,8 +56,7 @@ class TaskPipeline:
             Self for method chaining.
         """
         if description:
-            # Attach description to the function object so it can be retrieved during execution.
-            step._description = description  # type: ignore
+            self._step_descriptions[len(self._steps)] = description
         self._steps.append(step)
         return self
 
@@ -83,7 +85,7 @@ class TaskPipeline:
 
                 step_name = getattr(step, "__name__", "anonymous_step")
                 # Use a custom description if available, otherwise fallback to the function name.
-                description = getattr(step, "_description", step_name)
+                description = self._step_descriptions.get(i, step_name)
                 logger.info("[step %d/%d] %s...", i + 1, len(self._steps), description)
 
                 try:

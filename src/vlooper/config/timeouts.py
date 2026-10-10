@@ -1,3 +1,5 @@
+"""Configuration for timeouts."""
+
 import os
 from dataclasses import dataclass, field
 
@@ -5,6 +7,8 @@ from dataclasses import dataclass, field
 @dataclass
 class TimeoutConfig:
     """Timeout related configuration."""
+
+    # pylint: disable=too-many-instance-attributes
 
     max_task_retries: int = field(
         default_factory=lambda: int(os.environ.get("MAX_TASK_RETRIES", "2"))

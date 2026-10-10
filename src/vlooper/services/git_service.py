@@ -50,7 +50,9 @@ def setup_working_branch(repo_dir, branch_name, task_type):
             default_branch = get_default_branch(repo_dir)
             create_branch(repo_dir, branch_name, start_point=default_branch)
         else:
-            raise VLooperError(f"Could not find or create branch {branch_name}: {e}")
+            raise VLooperError(
+                f"Could not find or create branch {branch_name}: {e}"
+            ) from e
 
     if task_type == "PR":
         logger.info("Pulling remote branch %s...", branch_name)

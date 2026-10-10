@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from typing import Any
 
 from vlooper.infra.logger import get_logger
@@ -9,6 +11,7 @@ class PrCreatedHandler:
     """Handles telemetry/logging when a Pull Request has been successfully created."""
 
     def handle(self, ctx_data: Any) -> None:
+        """Logs telemetry information when a Pull Request is created."""
         task_id = ctx_data.get("task_id")
         repo = ctx_data.get("repo")
         branch = ctx_data.get("branch")

@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from abc import ABC, abstractmethod
 
 

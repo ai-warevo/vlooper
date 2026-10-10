@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 import argparse
 import re
 import sys
@@ -5,6 +7,7 @@ from pathlib import Path
 
 
 def get_all_py_files(root_dir):
+    """Find all Python files in the given directory, excluding common ignore directories."""
     py_files = []
     exclude_dirs = {".git", "__pycache__", ".venv", "venv"}
     for path in Path(root_dir).rglob("*.py"):
@@ -14,6 +17,7 @@ def get_all_py_files(root_dir):
 
 
 def get_module_name(file_path, src_root):
+    """Convert a file path to a dot-separated module name."""
     try:
         rel_path = file_path.relative_to(src_root)
         parts = list(rel_path.parts)
@@ -27,6 +31,7 @@ def get_module_name(file_path, src_root):
 
 
 def get_definitions(file_path):
+    """Extract all function and class definitions from a file."""
     defs = []
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -41,6 +46,7 @@ def get_definitions(file_path):
 
 
 def get_env_vars_from_file(path):
+    """Extract environment variable names from a .env-style file."""
     env_vars = set()
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -48,7 +54,6 @@ def get_env_vars_from_file(path):
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                # Typical .env format is KEY=VALUE
                 match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)\s*=", line)
                 if match:
                     env_vars.add(match.group(1))
@@ -58,6 +63,7 @@ def get_env_vars_from_file(path):
 
 
 def get_used_env_vars(file_to_content):
+    """Detect environment variable usage from file contents using regex patterns."""
     used_vars = set()
     patterns = [
         re.compile(r"os\.getenv\(\s*['\"]([^'\"]+)['\"]\s*\)"),
@@ -74,7 +80,105 @@ def get_used_env_vars(file_to_content):
     return used_vars
 
 
+def find_unused_files(all_py_files, file_to_content, src_root):
+    """Identify Python files that are not imported by any other file."""
+    mod_to_file = {}
+    for f in all_py_files:
+        if f.is_relative_to(src_root) and (mod_name := get_module_name(f, src_root)):
+            mod_to_file[mod_name] = f
+
+    unused_files = []
+    for mod, file_path in mod_to_file.items():
+        if file_path.name == "__init__.py":
+            continue
+
+        is_imported = False
+        for other_file, content in file_to_content.items():
+            if other_file != file_path:
+                pattern = r"\b" + re.escape(mod) + r"\b"
+                for line in content.splitlines():
+                    if line.strip().startswith(("import ", "from ")) and re.search(
+                        pattern, line
+                    ):
+                        is_imported = True
+                        break
+            if is_imported:
+                break
+
+        if not is_imported:
+            unused_files.append(file_path)
+    return unused_files
+
+
+def find_unused_definitions(all_py_files, file_to_content):
+    """Identify function and class definitions that are not referenced elsewhere."""
+    all_defs = []
+    for f in all_py_files:
+        for d in get_definitions(f):
+            d["file"] = f
+            all_defs.append(d)
+
+    unused_defs = []
+    for d in all_defs:
+        name, is_used = d["name"], False
+        pattern = r"\b" + re.escape(name) + r"\b"
+
+        for other_file, content in file_to_content.items():
+            if other_file == d["file"]:
+                continue
+            lines = content.splitlines()
+            for i, line in enumerate(lines):
+                if (
+                    (i + 1) != d["line"]
+                    and not line.strip().startswith("#")
+                    and re.search(pattern, line)
+                ):
+                    is_used = True
+                    break
+            if is_used:
+                break
+
+        if not is_used:
+            unused_defs.append(d)
+    return unused_defs
+
+
+def check_env_vars(file_to_content, cwd):
+    """Check for environment variables defined in .env files that are not used in the code."""
+    defined_env_vars = set()
+    for env_file in [cwd / ".env", cwd / ".env.example"]:
+        if env_file.exists():
+            defined_env_vars.update(get_env_vars_from_file(env_file))
+
+    if not defined_env_vars:
+        print("No .env or .env.example file found to analyze.")
+        return False, set()
+
+    used_env_vars = get_used_env_vars(file_to_content)
+    unused_env_vars = defined_env_vars - used_env_vars
+    return True, unused_env_vars
+
+
+def _print_results(label, items, formatter=None):
+    """Helper to print results."""
+    print(f"\n[?] Potential Unused {label}:")
+    if not items:
+        print("None found.")
+        return False
+    for item in (
+        sorted(items, key=lambda x: (str(x["file"]), x["line"]))
+        if formatter
+        else sorted(items)
+    ):
+        if formatter:
+            print(f"  - {formatter(item)}")
+        else:
+            print(f"  - {item}")
+    return True
+
+
 def analyze():
+    """Main orchestration function for the analysis tool."""
     parser = argparse.ArgumentParser(
         description="Analyze unused Python files and definitions."
     )
@@ -90,15 +194,12 @@ def analyze():
     )
     args = parser.parse_args()
 
-    cwd = Path(".")
-    src_root = cwd / "src"
+    cwd, src_root = Path("."), Path(".") / "src"
     if not src_root.exists():
         print("Error: src directory not found.")
         sys.exit(1)
 
     all_py_files = get_all_py_files(cwd)
-    print(f"Found {len(all_py_files)} python files.")
-
     file_to_content = {}
     for f in all_py_files:
         try:
@@ -107,104 +208,27 @@ def analyze():
         except Exception as e:
             print(f"Error reading {f}: {e}")
 
-    mod_to_file = {}
-    for f in all_py_files:
-        if f.is_relative_to(src_root):
-            mod_name = get_module_name(f, src_root)
-            if mod_name:
-                mod_to_file[mod_name] = f
-
-    unused_files = []
-    for mod, file_path in mod_to_file.items():
-        if file_path.name == "__init__.py":
-            continue
-
-        is_imported = False
-        for other_file, content in file_to_content.items():
-            if other_file == file_path:
-                continue
-
-            lines = content.splitlines()
-            for line in lines:
-                stripped = line.strip()
-                if stripped.startswith(("import ", "from ")):
-                    pattern = r"\b" + re.escape(mod) + r"\b"
-                    if re.search(pattern, line):
-                        is_imported = True
-                        break
-            if is_imported:
-                break
-
-        if not is_imported:
-            unused_files.append(file_path)
-
-    all_defs = []
-    for f in all_py_files:
-        defs = get_definitions(f)
-        for d in defs:
-            d["file"] = f
-            all_defs.append(d)
-
-    unused_defs = []
-    for d in all_defs:
-        name = d["name"]
-        is_used = False
-        pattern = r"\b" + re.escape(name) + r"\b"
-
-        for other_file, content in file_to_content.items():
-            lines = content.splitlines()
-            for i, line in enumerate(lines):
-                if other_file == d["file"] and (i + 1) == d["line"]:
-                    continue
-                if line.strip().startswith("#"):
-                    continue
-                if re.search(pattern, line):
-                    is_used = True
-                    break
-            if is_used:
-                break
-
-        if not is_used:
-            unused_defs.append(d)
-
     any_unused = False
-
-    print("\n[?] Potential Unused Files:")
-    if not unused_files:
-        print("None found.")
-    else:
-        for f in sorted(unused_files):
-            print(f"  - {f}")
+    if _print_results(
+        "Files", find_unused_files(all_py_files, file_to_content, src_root)
+    ):
         any_unused = True
 
-    print("\n[?] Potential Unused Definitions:")
-    if not unused_defs:
-        print("None found.")
-    else:
-        sorted_defs = sorted(unused_defs, key=lambda x: (str(x["file"]), x["line"]))
-        for d in sorted_defs:
-            print(
-                f"  - {d['type'].capitalize()} '{d['name']}' in {d['file']} (line {d['line']})"
-            )
+    if _print_results(
+        "Definitions",
+        find_unused_definitions(all_py_files, file_to_content),
+        lambda d: f"{d['type'].capitalize()} '{d['name']}' in {d['file']} (line {d['line']})",
+    ):
         any_unused = True
 
     if args.check_env_vars:
         print("\n[?] Potential Unused Environment Variables:")
-        defined_env_vars = set()
-        # Check .env and .env.example in the current directory
-        for env_file in [cwd / ".env", cwd / ".env.example"]:
-            if env_file.exists():
-                defined_env_vars.update(get_env_vars_from_file(env_file))
-
-        if not defined_env_vars:
-            print("No .env or .env.example file found to analyze.")
-        else:
-            used_env_vars = get_used_env_vars(file_to_content)
-            unused_env_vars = defined_env_vars - used_env_vars
-            if not unused_env_vars:
+        has_env, unused_ev = check_env_vars(file_to_content, cwd)
+        if has_env:
+            if not unused_ev:
                 print("None found.")
             else:
-                for var in sorted(unused_env_vars):
+                for var in sorted(unused_ev):
                     print(f"  - {var}")
                 any_unused = True
 

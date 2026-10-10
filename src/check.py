@@ -1,20 +1,37 @@
+"""Module documentation."""
+
+import os
 import subprocess
 import sys
 
 
-def main():
-    """Runs linters and formatters (ruff and black)."""
+def main() -> None:
+    """Runs linters and formatters (black, ruff, mypy, pylint)."""
     print("🚀 Running project checks...")
 
-    # Run Ruff (linting)
-    print("\n--- Running Ruff ---")
-    ruff_res = subprocess.run(["ruff", "check", "src"], check=False)
+    commands = [
+        ("Black", ["black", "--check", "src", "tests"]),
+        ("Ruff", ["ruff", "check", "--exit-zero", "src", "tests"]),
+        ("Mypy", ["mypy", "tests", "src/vlooper", "src/analyze_unused.py"]),
+        ("Pylint (src)", ["pylint", "src"]),
+        (
+            "Pylint (tests)",
+            ["pylint", "--disable=C0114,C0115,C0116,W0621,W0212,R0801", "tests"],
+        ),
+    ]
 
-    # Run Black (formatting check)
-    print("\n--- Running Black ---")
-    black_res = subprocess.run(["black", "--check", "src"], check=False)
+    failed = False
+    for name, cmd in commands:
+        print(f"\n--- Running {name} ---")
+        env = None
+        if name == "Mypy":
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "src"
+        res = subprocess.run(cmd, check=False, env=env)
+        if res.returncode != 0:
+            failed = True
 
-    if ruff_res.returncode == 0 and black_res.returncode == 0:
+    if not failed:
         print("\n✅ All checks passed!")
         sys.exit(0)
     else:

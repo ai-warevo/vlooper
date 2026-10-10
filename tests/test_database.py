@@ -28,17 +28,30 @@ def test_db_init(db):
 def test_add_task(db):
     """Test adding new tasks."""
     # Test adding new tasks
-    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main") is True
-    assert db.add_task("PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch") is True
+    assert (
+        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
+        is True
+    )
+    assert (
+        db.add_task(
+            "PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch"
+        )
+        is True
+    )
     # Test duplicate prevention
-    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main") is False
+    assert (
+        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
+        is False
+    )
 
 
 def test_get_pending_tasks(db):
     """Test getting pending tasks."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
     db.add_task("PR", "org/repo2", "https://github.com/org/repo2", 2, "branch-2")
-    db.add_task("ISSUE", "org/repo3", "https://github.com/org/repo3", 3, "main")  # This will be PENDING
+    db.add_task(
+        "ISSUE", "org/repo3", "https://github.com/org/repo3", 3, "main"
+    )  # PENDING
 
     pending = db.get_pending_tasks()
     assert len(pending) == 3

@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 import sqlite3
 
 from vlooper.infra.logger import get_logger
@@ -78,7 +80,8 @@ class DBMigrator:
                         (migration.description,),
                     )
                     conn.commit()
-                    # Remove from the list of things we've processed in this loop to allow correct ordering if migrations are provided out of order
+                    # Remove from applied list to allow correct ordering
+                    # if migrations are out of order
                     applied_descriptions.remove(migration.description)
                 except Exception as e:
                     conn.rollback()

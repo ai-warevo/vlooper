@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from vlooper.clients.opencode_client import OpencodeClient
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
@@ -40,10 +42,14 @@ def apply_ai_fix(ctx: TaskContext) -> None:
     # Construct a clean prompt for the agent with issue context if available and STRICT instructions
     prompt_parts = [
         (
-            f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repository {ctx.repo_full_name or ctx.repo_url} "
-            f"on branch '{ctx.branch_name or 'unknown'}'."
+            f"Fix issue #{ctx.issue_number} (Task {ctx.task_id}) in repo "
+            f"{ctx.repo_full_name or ctx.repo_url} on branch "
+            f"'{ctx.branch_name or 'unknown'}'."
         ),
-        "\nIMPORTANT: DO NOT use 'git commit', 'git push', or any other git commands to save your work.",
+        (
+            "\nIMPORTANT: DO NOT use 'git commit', 'git push', "
+            "or any other git commands to save your work."
+        ),
         "Only modify the necessary files to fix the issue.",
         "The system will handle committing and pushing your changes automatically.",
     ]

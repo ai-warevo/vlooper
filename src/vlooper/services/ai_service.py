@@ -20,18 +20,16 @@ def generate_commit_message(repo_dir: str, issue_number: int) -> str:
 
     # 1. Get the git diff
     stdout, err = get_diff(repo_dir)
-    if err:
-        logger.error("Failed to get git diff: %s", err)
-        return f"fix: automated fix for issue #{issue_number}"
-
-    if not stdout or not stdout.strip():
+    if err or not stdout or not stdout.strip():
+        if err:
+            logger.error("Failed to get git diff: %s", err)
         return f"fix: automated fix for issue #{issue_number}"
 
     # 2. Prepare the prompt
     prompt = (
         f"Write ONLY a single-line, concise commit message in conventional commits format "
         f"for the following git diff. Do not include any explanations or extra text:\n\n"
-        f"{stdout[:4000]}"  # Limit diff size to avoid huge prompts
+        f"{stdout[:4000]}"
     )
 
     # 3. Call Opencode agent via Client
@@ -46,12 +44,9 @@ def generate_commit_message(repo_dir: str, issue_number: int) -> str:
             return f"fix: automated fix for issue #{issue_number}"
 
         # 4. Clean up the result
-        # The agent might output more than just one line, so we take the first non-empty line
-        lines = [line.strip() for line in result.splitlines() if line.strip()]
+        lines = [line.strip() for line in (result or "").splitlines() if line.strip()]
         if lines:
-            # Take the first line as the commit message
             commit_msg = lines[0]
-            # Remove common prefixes if the agent added them like "Commit message: ..."
             if ":" in commit_msg and len(commit_msg.split(":")[0]) < 20:
                 commit_msg = commit_msg.split(":", 1)[1].strip()
 
@@ -64,6 +59,68 @@ def generate_commit_message(repo_dir: str, issue_number: int) -> str:
     return f"fix: automated fix for issue #{issue_number}"
 
 
+def _get_diff_with_fallback(repo_dir: str) -> tuple[str | None, str | None]:
+    """Gets the diff, attempting to use default branch if no uncommitted changes exist."""
+    stdout, err = get_diff(repo_dir)
+    if err or not stdout or not stdout.strip():
+        try:
+            default_branch = get_default_branch(repo_dir)
+            logger.info("Attempting to fetch diff since %s...", default_branch)
+            return get_diff(repo_dir, base_branch=default_branch)
+        except Exception as e:
+            logger.warning(
+                "Could not determine divergence diff (base branch error): %s", e
+            )
+            return stdout, err
+    return stdout, err
+
+
+def _parse_ai_response(lines: list[str]) -> tuple[str | None, str | None]:
+    """Parses the AI response into title and body."""
+    title, body = None, None
+    for i, line in enumerate(lines):
+        if line.upper().startswith("TITLE:"):
+            title = line.split(":", 1)[1].strip()
+        elif line.upper().startswith("BODY:"):
+            body = line.split(":", 1)[1].strip()
+            if i + 1 < len(lines) and not lines[i + 1].upper().startswith(
+                ("TITLE:", "BODY:")
+            ):
+                remaining_body = []
+                for next_line in lines[i + 1 :]:
+                    if next_line.upper().startswith(("TITLE:", "BODY:")):
+                        break
+                    remaining_body.append(next_line)
+                body += " " + " ".join(remaining_body)
+    return title, body
+
+
+def _build_pr_prompt(
+    issue_number: int, issue_title: str | None, issue_body: str | None, stdout: str
+) -> str:
+    """Builds the prompt for PR metadata generation."""
+    issue_context = ""
+    if issue_title or issue_body:
+        issue_context = f"\nCONTEXT FROM ISSUE #{issue_number}:\n"
+        if issue_title:
+            issue_context += f"Title: {issue_title}\n"
+        if issue_body:
+            issue_context += f"Body: {issue_body}\n"
+
+    return (
+        f"Based on the following git diff for issue #{issue_number}, generate a concise "
+        f"Pull Request title and a short description of the changes. "
+        f"The goal is to explain how these changes address the problem "
+        f"described in the issue context.\n\n"
+        f"{issue_context}\n"
+        f"Return your response in exactly this format:\n\n"
+        f"TITLE: [Your generated title]\n"
+        f"BODY: [Your generated body]\n\n"
+        f"Do not include any other text, explanations or conversational filler.\n\n"
+        f"Diff:\n{stdout[:5000]}"
+    )
+
+
 def generate_pr_metadata(
     repo_dir: str,
     issue_number: int,
@@ -74,99 +131,40 @@ def generate_pr_metadata(
     """Generates a Pull Request title and body based on git diff and issue context using an LLM."""
     logger.info("Generating AI-powered PR metadata...")
 
-    issue_suffix = f"\n\n#{issue_number}" if issue_number else ""
-    default_title = f"Fix issue #{issue_number}" if issue_number else "Automated fix"
-    if issue_title:
-        default_title = issue_title
-    default_body = (
-        f"Automated fix generated by vLooper for task {task_id}.{issue_suffix}"
-    )
+    suffix = f"\n\n#{issue_number}" if issue_number else ""
 
-    # 1. Get the git diff
-    stdout, err = get_diff(repo_dir)
-    if err:
-        logger.error("Failed to get git diff for PR generation: %s", err)
-        return default_title, default_body
-
-    if not stdout or not stdout.strip():
-        # No uncommitted changes found; try getting the diff since divergence from the default branch
-        try:
-            default_branch = get_default_branch(repo_dir)
-            logger.info(
-                "No uncommitted changes found. Attempting to fetch diff since %s...",
-                default_branch,
-            )
-            stdout, err = get_diff(repo_dir, base_branch=default_branch)
-            if err:
-                logger.warning("Failed to get divergence diff: %s", err)
-        except Exception as e:
-            logger.warning(
-                "Could not determine divergence diff (base branch error): %s", e
-            )
-
-    if not stdout or not stdout.strip():
-        return default_title, default_body
-
-    # 2. Prepare the prompt
-    issue_context = ""
-    if issue_title or issue_body:
-        issue_context = f"\nCONTEXT FROM ISSUE #{issue_number}:\n"
-        if issue_title:
-            issue_context += f"Title: {issue_title}\n"
-        if issue_body:
-            issue_context += f"Body: {issue_body}\n"
-
-    prompt = (
-        f"Based on the following git diff for issue #{issue_number}, generate a concise "
-        f"Pull Request title and a short description of the changes. "
-        f"The goal is to explain how these changes address the problem described in the issue context.\n\n"
-        f"{issue_context}\n"
-        f"Return your response in exactly this format:\n\n"
-        f"TITLE: [Your generated title]\n"
-        f"BODY: [Your generated body]\n\n"
-        f"Do not include any other text, explanations or conversational filler.\n\n"
-        f"Diff:\n{stdout[:5000]}"
-    )
-
-    # 3. Call Opencode agent via Client
-    client = OpencodeClient()
-    try:
-        result, err = client.run(prompt, cwd=repo_dir)
-
+    stdout, err = _get_diff_with_fallback(repo_dir)
+    if err or not stdout or not stdout.strip():
         if err:
+            logger.error("Failed to get git diff for PR generation: %s", err)
+        return (
+            issue_title
+            or (f"Fix issue #{issue_number}" if issue_number else "Automated fix"),
+            f"Automated fix generated by vLooper for task {task_id}.{suffix}",
+        )
+
+    try:
+        result, err = OpencodeClient().run(
+            _build_pr_prompt(issue_number, issue_title, issue_body, stdout),
+            cwd=repo_dir,
+        )
+
+        if not err:
+            lines = [
+                line.strip() for line in (result or "").splitlines() if line.strip()
+            ]
+            title, body = _parse_ai_response(lines)
+            if title and body:
+                logger.info("Generated AI PR metadata - Title: %s", title)
+                return title, f"{body}{suffix}"
+            logger.warning("AI response was incomplete.")
+        else:
             logger.warning("AI PR metadata generation failed: %s. Using fallback.", err)
-            return default_title, default_body
-
-        # 4. Parse the result
-        lines = [line.strip() for line in result.splitlines() if line.strip()]
-        title, body = None, None
-
-        for i, line in enumerate(lines):
-            if line.upper().startswith("TITLE:"):
-                title = line.split(":", 1)[1].strip()
-            elif line.upper().startswith("BODY:"):
-                body = line.split(":", 1)[1].strip()
-                # If the body is multi-line, it might be on subsequent lines
-                if i + 1 < len(lines) and not lines[i + 1].upper().startswith(
-                    ("TITLE:", "BODY:")
-                ):
-                    remaining_body = []
-                    for next_line in lines[i + 1 :]:
-                        if next_line.upper().startswith(("TITLE:", "BODY:")):
-                            break
-                        remaining_body.append(next_line)
-                    body += " " + " ".join(remaining_body)
-
-        # Fallback if parsing failed or fields are empty
-        if not title or not body:
-            logger.warning("AI response was incomplete. Using fallback.")
-            return default_title, default_body
-
-        logger.info("Generated AI PR metadata - Title: %s", title)
-        # Ensure issue number is appended to the body
-        final_body = f"{body}{issue_suffix}"
-        return title, final_body
-
     except Exception as e:
         logger.error("Error during AI PR metadata generation: %s", e)
-        return default_title, default_body
+
+    return (
+        issue_title
+        or (f"Fix issue #{issue_number}" if issue_number else "Automated fix"),
+        f"Automated fix generated by vLooper for task {task_id}.{suffix}",
+    )

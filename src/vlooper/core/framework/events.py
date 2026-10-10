@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from enum import Enum
 
 

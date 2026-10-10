@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -10,9 +12,12 @@ class TaskContext:
     and arbitrary metadata.
     """
 
+    # pylint: disable=too-many-instance-attributes
+
     task_id: str
     issue_number: int
     repo_url: str
+    workspace_path: str  # Added this
     repo_full_name: str | None = None
     branch_name: str | None = None
     exit_code: int | None = None
@@ -22,3 +27,4 @@ class TaskContext:
     metadata: dict[str, Any] = field(default_factory=dict)
     issue_title: str | None = None
     issue_body: str | None = None
+    pr_details: dict[str, Any] | None = None

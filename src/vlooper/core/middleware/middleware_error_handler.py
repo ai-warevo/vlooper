@@ -1,3 +1,5 @@
+"""Module docstring."""
+
 from vlooper.infra.logger import get_logger
 
 from ..framework.context import TaskContext
@@ -23,6 +25,7 @@ class GlobalExceptionHandlerMiddleware:
             ctx.is_aborted = True
             ctx.error = e
             if ctx.workspace_path and ctx.branch_name:
+                # pylint: disable=import-outside-toplevel
                 from vlooper.services.git_service import quick_reset
 
                 quick_reset(ctx.workspace_path)

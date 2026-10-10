@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from typing import Any
 
 from vlooper.infra.logger import get_logger

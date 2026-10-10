@@ -1,3 +1,5 @@
+"""Module docstring."""
+
 import os
 
 from ..framework.context import TaskContext

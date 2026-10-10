@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from vlooper.clients.github_client import get_issue_details
 from vlooper.infra.logger import get_logger
 

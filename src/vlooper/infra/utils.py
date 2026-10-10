@@ -12,7 +12,7 @@ def run_command(
     cwd=None,
     timeout=None,
     truncate_lines: int | None = None,
-    input: str | None = None,
+    input_val: str | None = None,
 ):
     """Run a shell command with an optional timeout and truncation."""
     logger.debug("running command %s", cmd)
@@ -24,7 +24,7 @@ def run_command(
             cwd=cwd,
             timeout=timeout,
             check=False,
-            input=input,
+            input=input_val,
         )
         if res.returncode != 0:
             stdout = res.stdout

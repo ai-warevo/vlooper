@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 import re
 
 

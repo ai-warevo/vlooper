@@ -31,17 +31,21 @@ def test_scan_issues(scanner, db, monkeypatch):
             "body": "Describe it",
             "repository": {"nameWithOwner": "org/repo1"},
             "isPullRequest": False,
-            "author": {"login": "bot_user"}
+            "author": {"login": "bot_user"},
         }
     ]
 
-    def mock_run(cmd, *args, **kwargs):
+    def mock_run(cmd, *_args, **_kwargs):
         cmd_str = " ".join([str(x) for x in cmd]) if isinstance(cmd, list) else str(cmd)
         if "is:issue" in cmd_str:
-            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_issues), stderr="")
+            return CompletedProcess(
+                args=[], returncode=0, stdout=json.dumps(mock_issues), stderr=""
+            )
         if "is:pr" in cmd_str:
             return CompletedProcess(args=[], returncode=0, stdout="[]", stderr="")
-        return CompletedProcess(args=[], returncode=1, stdout="", stderr="Unknown command")
+        return CompletedProcess(
+            args=[], returncode=1, stdout="", stderr="Unknown command"
+        )
 
     with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()
@@ -62,20 +66,26 @@ def test_scan_prs(scanner, db, monkeypatch):
             "body": "PR body",
             "repository": {"nameWithOwner": "org/repo-pr"},
             "isPullRequest": True,
-            "author": {"login": "bot_user"}
+            "author": {"login": "bot_user"},
         }
     ]
     mock_pr_details = {"headRefName": "feature-xyz"}
 
-    def mock_run(cmd, *args, **kwargs):
+    def mock_run(cmd, *_args, **_kwargs):
         cmd_str = " ".join([str(x) for x in cmd]) if isinstance(cmd, list) else str(cmd)
         if "is:pr" in cmd_str:
-            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_prs), stderr="")
+            return CompletedProcess(
+                args=[], returncode=0, stdout=json.dumps(mock_prs), stderr=""
+            )
         if "view" in cmd_str and "pr" in cmd_str:
-            return CompletedProcess(args=[], returncode=0, stdout=json.dumps(mock_pr_details), stderr="")
+            return CompletedProcess(
+                args=[], returncode=0, stdout=json.dumps(mock_pr_details), stderr=""
+            )
         if "is:issue" in cmd_str:
             return CompletedProcess(args=[], returncode=0, stdout="[]", stderr="")
-        return CompletedProcess(args=[], returncode=1, stdout="", stderr="Unknown command")
+        return CompletedProcess(
+            args=[], returncode=1, stdout="", stderr="Unknown command"
+        )
 
     with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()

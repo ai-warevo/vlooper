@@ -1,3 +1,5 @@
+"""Module documentation."""
+
 from typing import Any
 
 from vlooper.infra.logger import get_logger
@@ -9,6 +11,8 @@ class GitIsolatedHandler:
     """Handles telemetry/logging when a repository has been successfully isolated."""
 
     def handle(self, ctx_data: Any) -> None:
+        """Handles the repository isolation event."""
+        # pylint: disable=duplicate-code
         task_id = ctx_data.get("task_id")
         repo = ctx_data.get("repo")
         branch = ctx_data.get("branch")

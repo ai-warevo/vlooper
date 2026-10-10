@@ -1,26 +1,36 @@
 #!/usr/bin/env python3
+"""Module documentation."""
+
 import argparse
 import os
 import sys
 
 try:
     from vlooper.core.daemon import VLooperDaemon
-except ImportError:
+except ImportError as exc:
     raise ImportError(
-        "Could not import VLooperDaemon. Ensure you are running from the project root or have installed the package."
-    )
-
-try:
-    from vlooper.ui.tui import VLooperTUI
-except ImportError:
-    VLooperTUI = None
+        "Could not import VLooperDaemon. "
+        "Ensure you are running from the project root."
+    ) from exc
 
 from vlooper.infra.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
 
+def get_tui_class() -> type | None:
+    """Returns the TUI class if available."""
+    try:
+        # pylint: disable=import-outside-toplevel
+        from vlooper.ui.tui import VLooperTUI
+
+        return VLooperTUI
+    except ImportError:
+        return None
+
+
 def main(argv=None):
+    """Main entry point for the vLooper daemon."""
     setup_logging()
     parser = argparse.ArgumentParser(description="vLooper Daemon")
     parser.add_argument("--tui", action="store_true", help="Run the TUI dashboard")
@@ -30,10 +40,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.tui:
-        if VLooperTUI is None:
+        v_tui_class = get_tui_class()
+        if v_tui_class is None:
             logger.error("TUI module not found.")
             sys.exit(1)
-        app = VLooperTUI()
+        app = v_tui_class()
         app.run()
         return
 
