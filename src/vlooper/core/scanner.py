@@ -1,5 +1,7 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
+from typing import Any, Dict, Optional
+
 import json
 
 from vlooper.infra.config import config
@@ -46,80 +48,91 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
     def _scan_issues(self):
         """Scan for open issues assigned to the bot."""
-        logger.debug("Scanning for issues in organization: %s...", config.org_name)
-        issues, err = get_assigned_items(
-            org_name=config.org_name,
-            bot_username=config.bot_username,
-            is_pr=False
-        )
-        if err:
-            logger.debug("Issue search failed. Error: %s", err)
-            return
-        if not issues:
-            logger.debug("No issues found.")
-            return
-
-        logger.debug(
-            "Found %s potential issue/PR items from GitHub search.", len(issues)
-        )
-
-        for issue in issues:
-            if issue.get("isPullRequest"):
-                continue
-
-            num = issue["number"]
-            repo_full_name = issue["repository"]["nameWithOwner"]
-            # For issues, we might want a representative branch name or just use 'issue-{num}'
-            branch_name = f"issue-{num}"
-            logger.debug(
-                "Adding task for issue #%s: %s (branch: %s)",
-                num,
-                repo_full_name,
-                branch_name,
-            )
-            self.db.add_task("ISSUE", repo_full_name, f"https://github.com/{repo_full_name}", num, branch_name)
+        self._scan_items(is_pr=False)
 
     def _scan_prs(self):
         """Scan for open Pull Requests assigned to the bot."""
-        logger.debug("Scanning for PRs in organization: %s...", config.org_name)
-        prs, err = get_assigned_items(
+        self._scan_items(is_pr=True)
+
+    def _scan_items(self, is_pr: bool):
+        """Generic scanner for issues and PRs."""
+        config_data = self._get_scan_config(is_pr)
+
+        logger.debug("Scanning for %s in organization: %s...", config_data["label"], config.org_name)
+        items, err = get_assigned_items(
             org_name=config.org_name,
             bot_username=config.bot_username,
-            is_pr=True
+            is_pr=is_pr
         )
+
         if err:
-            logger.debug("PR search failed. Error: %s", err)
+            logger.debug("%s search failed. Error: %s", config_data["error_label"], err)
             return
-        if not prs:
-            logger.debug("No PRs found.")
+        if not items:
+            logger.debug("No %s found.", config_data["empty_label"])
             return
 
         logger.debug(
-            "Found %s potential issue/PR items from GitHub search.", len(prs)
+            "Found %s potential issue/PR items from GitHub search.", len(items)
         )
 
-        for pr in prs:
-            if not pr.get("isPullRequest"):
+        for item in items:
+            if item.get("isPullRequest", False) != is_pr:
                 continue
+            self._process_scan_item(item, config_data, is_pr)
 
-            num = pr["number"]
-            repo_full_name = pr["repository"]["nameWithOwner"]
+    def _get_scan_config(self, is_pr: bool) -> Dict[str, str]:
+        """Returns configuration metadata for the scan type."""
+        if is_pr:
+            return {
+                "label": "PRs",
+                "error_label": "PR",
+                "empty_label": "PRs",
+                "task_label": "PR",
+                "db_type": "PR"
+            }
+        return {
+            "label": "issues",
+            "error_label": "Issue",
+            "empty_label": "issues",
+            "task_label": "issue",
+            "db_type": "ISSUE"
+        }
 
-            # Get the branch name for the PR
+    def _process_scan_item(self, item: Dict[str, Any], config_data: Dict[str, str], is_pr: bool):
+        """Processes a single item found during scanning."""
+        num = item["number"]
+        repo_full_name = item["repository"]["nameWithOwner"]
+        branch = self._resolve_branch_name(num, repo_full_name, is_pr)
+
+        if not branch:
+            return
+
+        logger.debug(
+            "Adding task for %s #%s: %s (branch: %s)",
+            config_data["task_label"], num, repo_full_name, branch
+        )
+        self.db.add_task(
+            config_data["db_type"],
+            repo_full_name,
+            f"https://github.com/{repo_full_name}",
+            num,
+            branch
+        )
+
+    def _resolve_branch_name(self, num: int, repo_full_name: str, is_pr: bool) -> Optional[str]:
+        """Resolves the appropriate branch name for an issue or PR."""
+        if is_pr:
             logger.debug("Fetching details for PR #%s to get head branch...", num)
-            pr_data = get_github_item(num, repo_full_name, item_type="pr", fields=["headRefName"])
-            if not pr_data:
+            item_data = get_github_item(num, repo_full_name, item_type="pr", fields=["headRefName"])
+            if not item_data:
                 logger.debug("Could not fetch details for PR #%s. Skipping.", num)
-                continue
+                return None
 
-            branch = pr_data.get("headRefName")
-            if branch:
-                logger.debug(
-                    "Adding task for PR #%s: %s (branch: %s)",
-                    num,
-                    repo_full_name,
-                    branch,
-                )
-                self.db.add_task("PR", repo_full_name, f"https://github.com/{repo_full_name}", num, branch)
-            else:
+            branch = item_data.get("headRefName")
+            if not branch:
                 logger.warning("Could not find headRefName for PR #%s.", num)
+                return None
+            return branch
+        else:
+            return f"issue-{num}"
