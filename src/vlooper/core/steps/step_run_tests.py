@@ -38,6 +38,7 @@ def run_repository_tests(ctx: TaskContext) -> None:
                 event_bus.emit("harness:test_passed", {"task_id": ctx.task_id})
         else:
             logger.warning("❌ Tests failed with exit code %d.", ctx.exit_code)
+            logger.error("--- TEST FAILURE DETAILS ---\n%s\n-----------------------------", ctx.error_logs)
 
     except Exception as e:
         logger.exception("🚨 Critical error while running test harness: %s", e)
