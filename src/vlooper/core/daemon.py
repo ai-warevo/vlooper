@@ -92,6 +92,22 @@ class VLooperDaemon:
             }
         )
 
+    def _update_task_status(self, ctx: TaskContext) -> None:
+        """
+        Updates the database with final results from the pipeline execution.
+        Determines status based on context flags and exit codes.
+        """
+        try:
+            if ctx.is_aborted or (ctx.exit_code is not None and ctx.exit_code != 0):
+                error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
+                logger.info("📝 Finalizing task #%s as FAILED: %s", ctx.task_id, error_msg)
+                self.db.fail_task(ctx.task_id, error_msg)
+            else:
+                logger.info("📝 Finalizing task #%s as COMPLETED.", ctx.task_id)
+                self.db.complete_task(ctx.task_id)
+        except Exception as e:
+            logger.error("❌ Failed to update database for task #%s: %s", ctx.task_id, e)
+
     def _post_completion_comment(self, ctx: TaskContext) -> None:
         """Posts a summary comment to the GitHub issue/PR after pipeline completion."""
         # Construct task data for the legacy helper function
