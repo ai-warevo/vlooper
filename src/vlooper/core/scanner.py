@@ -77,9 +77,8 @@ class Scanner:  # pylint: disable=too-few-public-methods
         )
 
         for item in items:
-            if item.get("isPullRequest", False) != is_pr:
-                continue
-            self._process_scan_item(item, config_data, is_pr)
+            if item.get("isPullRequest", False) == is_pr:
+                self._process_scan_item(item, config_data, is_pr)
 
     def _get_scan_config(self, is_pr: bool) -> Dict[str, str]:
         """Returns configuration metadata for the scan type."""
