@@ -158,7 +158,6 @@ class VLooperDaemon:
         self.pipeline.run(ctx)
 
         # Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
-        logger.info("🔔 Emitting '%s' event for Task #%s...", EventName.TASK_FINISHED, ctx.task_id)
         self.event_bus.emit(EventName.TASK_FINISHED, ctx)
 
     def _execute_loop(self, retry_failed: bool) -> None:
