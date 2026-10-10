@@ -1,6 +1,6 @@
 from ..framework.context import TaskContext
 from ..framework.types import StepFn
-from vlooper.integrations.git_manager import commit_and_push
+from vlooper.integrations.git_manager import commit_and_push, stash_and_checkout_main, delete_local_branch
 from vlooper.integrations.github_client import create_pull_request
 from vlooper.logger import get_logger
 
@@ -67,6 +67,11 @@ def github_create_pull_request(ctx: TaskContext) -> None:
                 "details": ctx.pr_details
             })
 
+        # Cleanup after successful PR creation
+        delete_local_branch(ctx.workspace_path, ctx.branch_name)
+
     except Exception as e:
         logger.exception("❌ Failed to complete GitHub Pull Request workflow: %s", e)
+        # Cleanup on failure: stash changes and return to main/master
+        stash_and_checkout_main(ctx.workspace_path)
         raise e

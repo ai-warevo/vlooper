@@ -19,4 +19,6 @@ class GlobalExceptionHandlerMiddleware:
             logger.exception("🚨 Uncaught exception detected at the top-level pipeline boundary: %s", e)
             ctx.is_aborted = True
             ctx.error = e
-            # We do not re-raise here so that the execution can return normally to the caller.
+            if ctx.workspace_path and ctx.branch_name:
+                from vlooper.integrations.git_manager import stash_and_checkout_main
+                stash_and_checkout_main(ctx.workspace_path)
