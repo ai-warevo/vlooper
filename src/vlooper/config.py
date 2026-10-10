@@ -26,11 +26,11 @@ class Config:  # pylint: disable=too-many-instance-attributes
     db_path: str = field(
         default_factory=lambda: os.environ.get("DB_PATH", "vlooper.db")
     )
-    max_retries: int = field(
-        default_factory=lambda: int(os.environ.get("MAX_RETRIES", "2"))
+    max_task_retries: int = field(
+        default_factory=lambda: int(os.environ.get("MAX_TASK_RETRIES", "2"))
     )
-    max_attempts: int = field(
-        default_factory=lambda: int(os.environ.get("MAX_ATTEMPTS", "5"))
+    max_pipeline_attempts: int = field(
+        default_factory=lambda: int(os.environ.get("MAX_PIPELINE_ATTEMPTS", "5"))
     )
     execution_timeout: int = field(
         default_factory=lambda: int(os.environ.get("EXECUTION_TIMEOUT", "300"))

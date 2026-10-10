@@ -66,7 +66,7 @@ class VLooperDaemon:
             # Middleware Layering (Outer to Inner)
             .use(GlobalExceptionHandlerMiddleware())  # Catches unforeseen bugs
             .use(GitHubAuthCheckMiddleware())         # Fails early if tokens missing
-            .use(RetryLimitMiddleware(max_attempts=config.max_attempts)) # Controls test-fix retries
+            .use(RetryLimitMiddleware(max_pipeline_attempts=config.max_pipeline_attempts)) # Controls test-fix retries
 
             # Execution Step Sequencing (Core Work)
             .add_step(git_isolate_repository)        # 1. Setup workspace/branch

@@ -100,7 +100,7 @@ class Database:
                 SET status = 'CLAIMED', updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ? AND (status = 'PENDING' OR (status = 'FAILED' AND retries < ?))
             """,
-                (task_id, config.max_retries),
+                (task_id, config.max_task_retries),
             )
             conn.commit()
             return cursor.rowcount > 0
@@ -124,7 +124,7 @@ class Database:
             # Check retries
             cursor = conn.execute("SELECT retries FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
-            if row and row[0] < config.max_retries:
+            if row and row[0] < config.max_task_retries:
                 conn.execute(
                     """
                     UPDATE tasks 
@@ -145,7 +145,7 @@ updated_at = CURRENT_TIMESTAMP
                 )
             conn.commit()
 
-    def is_task_at_max_retries(self, task_id) -> bool:
+    def is_task_at_max_task_retries(self, task_id) -> bool:
         """Check if the task has exhausted all retries."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -154,7 +154,7 @@ updated_at = CURRENT_TIMESTAMP
             )
             row = cursor.fetchone()
             if row and row["status"] == "FAILED":
-                return row["retries"] >= config.max_retries
+                return row["retries"] >= config.max_task_retries
         return False
 
     def get_active_claimed_task(self):

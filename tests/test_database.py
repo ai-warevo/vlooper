@@ -78,8 +78,8 @@ def test_complete_task(db):
 
 def test_fail_task_retry(db, monkeypatch):
     """Test task retry mechanism and failure threshold."""
-    # Mock config for max_retries
-    monkeypatch.setattr(config, "max_retries", 2)
+    # Mock config for max_task_retries
+    monkeypatch.setattr(config, "max_task_retries", 2)
 
     db.add_task("ISSUE", "org/repo1", "issue-1")
     tasks = db.get_pending_tasks()
@@ -103,7 +103,7 @@ def test_fail_task_retry(db, monkeypatch):
         assert row[0] == "PENDING"
         assert row[1] == 2
 
-    # Third failure: exceeds max_retries (2), should move to FAILED
+    # Third failure: exceeds max_task_retries (2), should move to FAILED
     db.fail_task(task_id, "Error 3")
     with db._get_connection() as conn:
         row = conn.execute("SELECT status FROM tasks WHERE id=?", (task_id,)).fetchone()
