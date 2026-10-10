@@ -1,42 +1,42 @@
-"""Script to run all linters and checks in one command."""
+"""Module documentation."""
 
+import os
 import subprocess
 import sys
 
-from vlooper.logger import get_logger
-
-logger = get_logger(__name__)
-
-
-def run_command(command: list[str]) -> int:
-    """Runs a system command and returns its return code."""
-    logger.info("[%s]▶️ Running...", " ".join(command))
-    try:
-        result = subprocess.run(command, check=False)
-        if result.returncode == 0:
-            logger.info("[%s]✅ Success!", " ".join(command))
-            return 0
-        logger.error("❌ Error! Return code: %s", result.returncode)
-        return result.returncode
-    except OSError as e:
-        logger.error("❌ Failed to run command: %s", e)
-        return 1
-
 
 def main() -> None:
-    """Sequentially runs the entire code check stack."""
+    """Runs linters and formatters (black, ruff, mypy, pylint)."""
+    print("🚀 Running project checks...")
+
     commands = [
-        ["black", "src", "tests"],
-        ["ruff", "check", "--exit-zero", "src", "tests"],
-        ["mypy", "src", "tests"],
-        ["pylint", "src"],
-        ["pylint", "--disable=C0114,C0115,C0116,W0621,W0212,R0801", "tests"],
+        ("Black", ["black", "--check", "src", "tests"]),
+        ("Ruff", ["ruff", "check", "--exit-zero", "src", "tests"]),
+        ("Mypy", ["mypy", "tests", "src/vlooper", "src/analyze_unused.py"]),
+        ("Pylint (src)", ["pylint", "src"]),
+        (
+            "Pylint (tests)",
+            ["pylint", "--disable=C0114,C0115,C0116,W0621,W0212,R0801", "tests"],
+        ),
     ]
 
-    for cmd in commands:
-        if run_command(cmd) != 0:
-            logger.error("🚨 Some checks failed!")
-            sys.exit(1)
+    failed = False
+    for name, cmd in commands:
+        print(f"\n--- Running {name} ---")
+        env = None
+        if name == "Mypy":
+            env = os.environ.copy()
+            env["PYTHONPATH"] = "src"
+        res = subprocess.run(cmd, check=False, env=env)
+        if res.returncode != 0:
+            failed = True
+
+    if not failed:
+        print("\n✅ All checks passed!")
+        sys.exit(0)
+    else:
+        print("\n❌ Some checks failed.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

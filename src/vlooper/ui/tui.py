@@ -5,7 +5,7 @@ from typing import ClassVar
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 
-from vlooper.database import Database
+from vlooper.persistence.database import Database
 
 
 class VLooperTUI(App):
@@ -49,7 +49,9 @@ class VLooperTUI(App):
         """Called when the application is mounted."""
         self.table = self.query_one(DataTable)
         self.status_label = self.query_one("#status-panel", Static)
-        self.table.add_columns("ID", "Type", "Repo", "Branch", "Status")
+        self.table.add_columns(
+            "ID", "Repository", "Type", "#", "Status", "Retries", "Branch"
+        )
         self.set_interval(3, self.update_data)
         self.update_data()
 
@@ -60,10 +62,10 @@ class VLooperTUI(App):
             active = self.db.get_active_claimed_task()
             if active:
                 status_text = (
-                    f"🚀 WORKING ON: #{active['id']} ({active['repo_full_name']})"
+                    f"WORKING ON: #{active['id']} ({active['repo_full_name']})"
                 )
             else:
-                status_text = "💤 IDLE - Waiting for tasks..."
+                status_text = "IDLE - Waiting for tasks..."
 
             if self.status_label:
                 self.status_label.update(status_text)
@@ -73,16 +75,21 @@ class VLooperTUI(App):
             if self.table:
                 self.table.clear()
                 for t in tasks:
+                    issue_val = (
+                        str(t["issue_number"]) if t["issue_number"] is not None else "-"
+                    )
                     self.table.add_row(
                         str(t["id"]),
+                        t["repo_full_name"],
                         t["task_type"],
-                        t["repo_full_name"].split("/")[-1],
-                        t["branch_name"],
+                        issue_val,
                         t["status"],
+                        str(t["retries"]),
+                        t["branch_name"],
                     )
         except Exception as e:  # noqa: W0718
             if self.status_label:
-                self.status_label.update(f"⚠️ Error loading data: {e}")
+                self.status_label.update(f"Error loading data: {e}")
 
     async def action_quit(self) -> None:
         """Handle the quit action."""

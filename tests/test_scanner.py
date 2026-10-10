@@ -1,13 +1,10 @@
-# pylint: disable=redefined-outer-name,protected-access,unused-argument
-"""Tests for the Scanner class."""
-
 import json
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
 import pytest
-
-from vlooper.database import Database
+from vlooper.config import config
+from vlooper.persistence.database import Database
 from vlooper.core.scanner import Scanner
 
 
@@ -26,7 +23,7 @@ def scanner(db):
 
 def test_scan_issues(scanner, db, monkeypatch):
     """Test the issue scanning functionality."""
-    # Mock the subprocess call inside run_command/Scanner._scan_issues
+    monkeypatch.setattr(config.git, "authorized_users", ["bot_user"])
     mock_issues = [
         {
             "number": 1,
@@ -34,23 +31,25 @@ def test_scan_issues(scanner, db, monkeypatch):
             "body": "Describe it",
             "repository": {"nameWithOwner": "org/repo1"},
             "isPullRequest": False,
+            "author": {"login": "bot_user"},
         }
     ]
 
-    def mock_run(cmd, *args, **kwargs):
-        # Check if the call is for gh search issues
-        if "gh" in cmd and "search" in cmd and "is:issue" in cmd:
+    def mock_run(cmd, *_args, **_kwargs):
+        cmd_str = " ".join([str(x) for x in cmd]) if isinstance(cmd, list) else str(cmd)
+        if "is:issue" in cmd_str:
             return CompletedProcess(
                 args=[], returncode=0, stdout=json.dumps(mock_issues), stderr=""
             )
+        if "is:pr" in cmd_str:
+            return CompletedProcess(args=[], returncode=0, stdout="[]", stderr="")
         return CompletedProcess(
-            args=[], returncode=1, stdout="", stderr="Not a search command"
+            args=[], returncode=1, stdout="", stderr="Unknown command"
         )
 
-    with patch("vlooper.utils.subprocess.run", side_effect=mock_run):
+    with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()
 
-    # Verify task was added to DB
     pending = db.get_pending_tasks()
     assert len(pending) == 1
     assert pending[0]["repo_full_name"] == "org/repo1"
@@ -59,7 +58,7 @@ def test_scan_issues(scanner, db, monkeypatch):
 
 def test_scan_prs(scanner, db, monkeypatch):
     """Test the PR scanning functionality."""
-    # Mock the two calls: 1. search prs, 2. get branch details via gh pr view
+    monkeypatch.setattr(config.git, "authorized_users", ["bot_user"])
     mock_prs = [
         {
             "number": 42,
@@ -67,29 +66,30 @@ def test_scan_prs(scanner, db, monkeypatch):
             "body": "PR body",
             "repository": {"nameWithOwner": "org/repo-pr"},
             "isPullRequest": True,
+            "author": {"login": "bot_user"},
         }
     ]
     mock_pr_details = {"headRefName": "feature-xyz"}
 
-    def mock_run(cmd, *args, **kwargs):
-        # Check if the call is for gh search prs, 2. get branch details via gh pr view
-
-        if "gh" in cmd and "search" in cmd and "is:pr" in cmd:
+    def mock_run(cmd, *_args, **_kwargs):
+        cmd_str = " ".join([str(x) for x in cmd]) if isinstance(cmd, list) else str(cmd)
+        if "is:pr" in cmd_str:
             return CompletedProcess(
                 args=[], returncode=0, stdout=json.dumps(mock_prs), stderr=""
             )
-        if "gh" in cmd and "pr" in cmd and "view" in cmd:
+        if "view" in cmd_str and "pr" in cmd_str:
             return CompletedProcess(
                 args=[], returncode=0, stdout=json.dumps(mock_pr_details), stderr=""
             )
+        if "is:issue" in cmd_str:
+            return CompletedProcess(args=[], returncode=0, stdout="[]", stderr="")
         return CompletedProcess(
             args=[], returncode=1, stdout="", stderr="Unknown command"
         )
 
-    with patch("vlooper.utils.subprocess.run", side_effect=mock_run):
+    with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()
 
-    # Verify task was added to DB
     pending = db.get_pending_tasks()
     assert len(pending) == 1
     assert pending[0]["repo_full_name"] == "org/repo-pr"

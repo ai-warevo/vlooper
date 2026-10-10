@@ -3,39 +3,28 @@
 import sqlite3
 
 from vlooper.config import config
+from vlooper.persistence.db_migrator import DBMigrator
+from vlooper.persistence.migrations import MIGRATIONS
 
 
 class Database:
     """SQLite database handler for tasks."""
 
-    def __init__(self, db_path=config.db_path):
+    def __init__(self, db_path=config.infra.db_path):
         """Initialize the database with a given path."""
         self.db_path = db_path
-        self._init_db()
+        self._run_migrations()
+
+    def _run_migrations(self):
+        """Run database migrations."""
+        migrator = DBMigrator(self.db_path)
+        migrator.migrate(MIGRATIONS, direction="up")
 
     def _get_connection(self):
         """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
 
-    def _init_db(self):
-        """Initialize the database schema."""
-        with self._get_connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    task_type TEXT NOT NULL, -- ISSUE or PR
-                    repo_full_name TEXT NOT NULL,
-                    branch_name TEXT NOT NULL,
-                    status TEXT NOT NULL, -- PENDING, CLAIMED, COMPLETED, FAILED
-                    retries INTEGER DEFAULT 0,
-                    last_error TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            conn.commit()
-
-    def add_task(self, task_type, repo_full_name, branch_name):
+    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name):
         """Add a new task to the database."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
@@ -44,10 +33,11 @@ class Database:
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO tasks (task_type, repo_full_name, branch_name, status)
-                VALUES (?, ?, ?, 'PENDING')
+                INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, 
+                                   branch_name, status)
+                VALUES (?, ?, ?, ?, ?, 'PENDING')
             """,
-                (task_type, repo_full_name, branch_name),
+                (task_type, repo_full_name, repo_url, issue_number, branch_name),
             )
             conn.commit()
         return True
@@ -98,7 +88,7 @@ class Database:
                 SET status = 'CLAIMED', updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ? AND (status = 'PENDING' OR (status = 'FAILED' AND retries < ?))
             """,
-                (task_id, config.max_retries),
+                (task_id, config.timeouts.max_task_retries),
             )
             conn.commit()
             return cursor.rowcount > 0
@@ -122,7 +112,7 @@ class Database:
             # Check retries
             cursor = conn.execute("SELECT retries FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
-            if row and row[0] < config.max_retries:
+            if row and row[0] < config.timeouts.max_task_retries:
                 conn.execute(
                     """
                     UPDATE tasks 
@@ -142,18 +132,6 @@ updated_at = CURRENT_TIMESTAMP
                     (error_msg, task_id),
                 )
             conn.commit()
-
-    def is_task_at_max_retries(self, task_id) -> bool:
-        """Check if the task has exhausted all retries."""
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute(
-                "SELECT status, retries FROM tasks WHERE id = ?", (task_id,)
-            )
-            row = cursor.fetchone()
-            if row and row["status"] == "FAILED":
-                return row["retries"] >= config.max_retries
-        return False
 
     def get_active_claimed_task(self):
         """Get the currently active claimed task."""

@@ -1,5 +1,13 @@
 # 🔄 vLooper
 
+<div align="center">
+
+**🇬🇧 English • [🇷🇺 Русский](./docs/ru/README.md)**
+
+</div> 
+
+---
+
 **vLooper** is a lightweight local automation daemon (Loop & Harness Engineering) that transforms the **Ollama + OpenCode** stack into an autonomous AI developer for GitHub organizations.
 
 It scans organization-wide issues/PRs, pulls repositories locally, and runs a continuous "Write -> Test -> Fix" loop using `OpenCode` until the task is solved and a Pull Request is created.
@@ -16,6 +24,12 @@ It scans organization-wide issues/PRs, pulls repositories locally, and runs a co
     *   The worker runs your `./test.sh`.
     *   If tests fail, the error logs are fed back to the agent to trigger an automatic fix.
 5.  **Deliver:** Once tests pass, the bot commits and pushes the branch, creating an automated **Pull Request**.
+
+---
+
+## 📚 Documentation
+
+* [Project Architecture](./docs/en/architecture.md)
 
 ---
 
@@ -42,30 +56,32 @@ export GH_TOKEN=your_bot_token_here
 ```
 
 ### 2. Running the Daemon
-To start the daemon (the engine that scans and processes tasks):
+To start the core engine that scans and processes tasks:
 
 ```sh
-# Run the core engine in a dedicated terminal
-uv run main.py
+uv run vlooper
 ```
 
-**Advanced usage:**
-* `--retry-failed`: Instead of scanning GitHub for new tasks, the daemon will look for failed tasks in the local database and try to process them again. Useful after you've patched a bug that caused previous failures!
+*Alternatively, run from source:* `python -m vlooper`
+
+---
+
+### 🛠 Specialized Commands
+
+**Retry Failed Tasks**  
+Instead of scanning GitHub for new tasks, specifically targets failed tasks in the local database. Useful after you've patched a bug that caused previous failures!
 
 ```sh
-# Retry all FAILED tasks from the database
-uv run main.py --retry-failed
+uv run vlooper-retry
 ```
 
-### 3. Monitoring (TUI Dashboard)
+**Monitoring (TUI Dashboard)**  
 To see what the agent is doing in real-time with a beautiful terminal interface, **open a second terminal** and run:
 
 ```sh
-# Launch the local TUI dashboard in another terminal
-uv run main.py --tui
+uv run vlooper-tui
 ```
 *Note: The TUI is only a viewer. You must have the daemon running in a separate window to see any activity.*
-
 
 ---
 
@@ -75,7 +91,8 @@ Use these commands to maintain code quality and run tests during development:
 
 | Command | Description |
 | :--- | :--- |
-| `uv run check` | Run linters, type checkers, and formatters |
+| `uv run check` | Run linters and formatters |
+| `uv run analyze` | Identify unused files and definitions |
 | `uv run pytest` | Execute the test suite |
 | `uv sync` | Synchronize local environment with `pyproject.toml` |
 
