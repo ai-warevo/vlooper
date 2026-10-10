@@ -11,6 +11,16 @@ IGNORE_FILES = {
     Path("src/vlooper/__main__.py"),
 }
 
+# Common lifecycle methods used by frameworks like Textual or FastAPI/Flask
+FRAMEWORK_METHODS = {
+    "compose",
+    "on_mount",
+    "on_unmount",
+    "action_quit",
+    "render",
+    "on_click",
+}
+
 
 def get_all_py_files(root_dir):
     """Find all Python files in the given directory, excluding common ignore directories."""
@@ -124,7 +134,7 @@ def find_unused_files(all_py_files, file_to_content, src_root):
     return unused_files
 
 
-def find_unused_definitions(all_py_files, file_to_content):
+def find_unused_definitions(all_py_files, file_to_content, known_used_names):
     """Identify function and class definitions that are not referenced elsewhere."""
     all_defs = []
     for f in all_py_files:
@@ -138,20 +148,25 @@ def find_unused_definitions(all_py_files, file_to_content):
             continue
 
         name, is_used = d["name"], False
-        pattern = r"\b" + re.escape(name) + r"\b"
 
-        for content in file_to_content.values():
-            lines = content.splitlines()
-            for i, line in enumerate(lines):
-                if (
-                    (i + 1) != d["line"]
-                    and not line.strip().startswith("#")
-                    and re.search(pattern, line)
-                ):
-                    is_used = True
+        if name in known_used_names:
+            is_used = True
+
+        if not is_used:
+            pattern = r"\b" + re.escape(name) + r"\b"
+
+            for content in file_to_content.values():
+                lines = content.splitlines()
+                for i, line in enumerate(lines):
+                    if (
+                        (i + 1) != d["line"]
+                        and not line.strip().startswith("#")
+                        and re.search(pattern, line)
+                    ):
+                        is_used = True
+                        break
+                if is_used:
                     break
-            if is_used:
-                break
 
         if not is_used:
             unused_defs.append(d)
@@ -172,6 +187,30 @@ def check_env_vars(file_to_content, cwd):
     used_env_vars = get_used_env_vars(file_to_content)
     unused_env_vars = defined_env_vars - used_env_vars
     return True, unused_env_vars
+
+
+def get_known_used_names(cwd):
+    """Gather names that are known to be used (e.g., from pyproject.toml or frameworks)."""
+    known_used = set(FRAMEWORK_METHODS)
+
+    # Check pyproject.toml for script entry points
+    pyproject_path = cwd / "pyproject.toml"
+    if pyproject_path.exists():
+        try:
+            content = pyproject_path.read_text(encoding="utf-8")
+            # Look for the [project.scripts] section
+            script_section = re.search(
+                r"\[project\.scripts\](.*?)(?=\n\[|$)", content, re.DOTALL
+            )
+            if script_section:
+                # Extract function names from "name = 'module:function'" patterns
+                pattern = r'^\s*[^=]+=\s*[\'"][\w\.]+:([\w]+)[\'"]'
+                entries = re.findall(pattern, script_section.group(1), re.MULTILINE)
+                known_used.update(entries)
+        except Exception as e:
+            print(f"Warning: Could not parse pyproject.toml for scripts: {e}")
+
+    return known_used
 
 
 def _print_results(label, items, formatter=None):
@@ -214,6 +253,8 @@ def analyze():
         print("Error: src directory not found.")
         sys.exit(1)
 
+    known_used_names = get_known_used_names(cwd)
+
     all_py_files = get_all_py_files(cwd)
     file_to_content = {}
     for f in all_py_files:
@@ -231,7 +272,7 @@ def analyze():
 
     if _print_results(
         "Definitions",
-        find_unused_definitions(all_py_files, file_to_content),
+        find_unused_definitions(all_py_files, file_to_content, known_used_names),
         lambda d: f"{d['type'].capitalize()} '{d['name']}' in {d['file']} (line {d['line']})",
     ):
         any_unused = True

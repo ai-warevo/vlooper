@@ -70,6 +70,7 @@ def post_github_comment(task, message):
         except Exception as e:  # noqa: W0718
             logger.error("Error posting GitHub comment: %s", e)
     elif task_type == "PR":
+        logger.debug(get_pr_details(repo_full_name, branch_name))
         logger.debug("TODO: pr comment logic ...")
 
 
