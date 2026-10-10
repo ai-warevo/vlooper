@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 import os
 import argparse
@@ -18,12 +17,12 @@ from vlooper.infra.logger import setup_logging, get_logger
 
 logger = get_logger(__name__)
 
-def main():
+def main(argv=None):
     setup_logging()
     parser = argparse.ArgumentParser(description="vLooper Daemon")
     parser.add_argument("--tui", action="store_true", help="Run the TUI dashboard")
     parser.add_argument("--retry-failed", action="store_true", help="Retry failed tasks from database")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.tui:
         if VLooperTUI is None:
@@ -39,6 +38,14 @@ def main():
     
     daemon = VLooperDaemon()
     daemon.run(retry_failed=args.retry_failed)
+
+def main_tui():
+    """Entry point specifically for the TUI dashboard."""
+    main(["--tui"])
+
+def main_retry():
+    """Entry point specifically for retrying failed tasks."""
+    main(["--retry-failed"])
 
 if __name__ == "__main__":
     main()
