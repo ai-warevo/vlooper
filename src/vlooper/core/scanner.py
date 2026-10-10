@@ -88,7 +88,7 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 repo_full_name,
                 branch_name,
             )
-            self.db.add_task("ISSUE", repo_full_name, branch_name)
+            self.db.add_task("ISSUE", repo_full_name, f"https://github.com/{repo_full_name}", num, branch_name)
 
     def _scan_prs(self):
         """Scan for open Pull Requests assigned to the bot."""
@@ -144,6 +144,6 @@ class Scanner:  # pylint: disable=too-few-public-methods
                         repo_full_name,
                         branch,
                     )
-                    self.db.add_task("PR", repo_full_name, branch)
+                    self.db.add_task("PR", repo_full_name, f"https://github.com/{repo_full_name}", num, branch)
             except (json.JSONDecodeError, KeyError):
                 logger.error("Failed to parse PR details for #%s", num)

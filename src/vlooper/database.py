@@ -25,6 +25,8 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     task_type TEXT NOT NULL, -- ISSUE or PR
                     repo_full_name TEXT NOT NULL,
+                    repo_url TEXT NOT NULL,
+                    issue_number INTEGER,
                     branch_name TEXT NOT NULL,
                     status TEXT NOT NULL, -- PENDING, CLAIMED, COMPLETED, FAILED
                     retries INTEGER DEFAULT 0,
@@ -35,7 +37,7 @@ class Database:
             """)
             conn.commit()
 
-    def add_task(self, task_type, repo_full_name, branch_name):
+    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name):
         """Add a new task to the database."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
@@ -44,10 +46,10 @@ class Database:
         with self._get_connection() as conn:
             conn.execute(
                 """
-                INSERT INTO tasks (task_type, repo_full_name, branch_name, status)
-                VALUES (?, ?, ?, 'PENDING')
+                INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, branch_name, status)
+                VALUES (?, ?, ?, ?, ?, 'PENDING')
             """,
-                (task_type, repo_full_name, branch_name),
+                (task_type, repo_full_name, repo_url, issue_number, branch_name),
             )
             conn.commit()
         return True
