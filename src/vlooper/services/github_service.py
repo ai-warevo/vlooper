@@ -5,6 +5,7 @@ from vlooper.clients.github_client import (
     create_pull_request,
     get_issue_author,
     get_item_info,
+    get_pr_details,
     post_comment,
     search_issues,
 )
