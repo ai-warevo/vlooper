@@ -121,6 +121,8 @@ def get_issue_author(repo_full_name, num):
         str(num),
         "--repo",
         repo_full_name,
+        "--json",
+        "author",
         "--jq",
         ".author.login",
     ]
