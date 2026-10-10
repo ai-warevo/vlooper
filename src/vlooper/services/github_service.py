@@ -10,7 +10,21 @@ from vlooper.clients.github_client import (
 from vlooper.logger import get_logger
 from vlooper.utils import build_gh_view_cmd, run_command
 
+
 logger = get_logger(__name__)
+
+
+def create_pull_request_workflow(repo_full_name, title, body, cwd):
+    """Wrapper for GitHub CLI pull request creation. Returns structured details."""
+    res, err = create_pull_request(
+        repo_full_name=repo_full_name,
+        title=title,
+        body=body,
+        cwd=cwd
+    )
+    if err:
+        return None, err
+    return {"html_url": res.strip()}, None
 
 
 def post_github_comment(task, message):
@@ -64,6 +78,7 @@ def get_github_author(task):
             if not err and stdout:
                 return stdout
     return "assignee"
+
 
 def get_issue_number(task):
     """Get issue number from task."""
