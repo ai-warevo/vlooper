@@ -2,7 +2,7 @@
 
 import json
 
-from vlooper.utils import run_command
+from vlooper.infra.utils import run_command
 
 
 def clone_repository(repo_full_name, repo_short_name, base_dir):

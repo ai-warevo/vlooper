@@ -2,7 +2,7 @@ from typing import List, Callable
 from .context import TaskContext
 from .types import Middleware, StepFn, NextFn
 from .event_bus import EventBus
-from vlooper.logger import get_logger
+from vlooper.infra.logger import get_logger
 
 logger = get_logger(__name__)
 

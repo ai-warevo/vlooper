@@ -2,9 +2,9 @@
 
 import os
 
-from vlooper.config import config
+from vlooper.infra.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.logger import get_logger
+from vlooper.infra.logger import get_logger
 from vlooper.clients.git_client import (
     checkout,
     pull,
@@ -17,7 +17,7 @@ from vlooper.clients.git_client import (
     stash,
     is_remote_branch_exists
 )
-from vlooper.utils import run_command
+from vlooper.infra.utils import run_command
 
 
 logger = get_logger(__name__)

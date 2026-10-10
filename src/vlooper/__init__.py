@@ -1,9 +1,9 @@
 """Main entry point for vLooper."""
 
-from vlooper.config import config
+from vlooper.infra.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.database import Database
-from vlooper.utils import run_command
+from vlooper.infra.database import Database
+from vlooper.infra.utils import run_command
 
 __all__ = [
     "Database",

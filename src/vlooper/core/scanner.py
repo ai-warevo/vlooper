@@ -2,10 +2,10 @@
 
 import json
 
-from vlooper.config import config
-from vlooper.database import Database
-from vlooper.logger import get_logger
-from vlooper.utils import build_gh_view_cmd, run_command
+from vlooper.infra.config import config
+from vlooper.infra.database import Database
+from vlooper.infra.logger import get_logger
+from vlooper.infra.utils import build_gh_view_cmd, run_command
 
 logger = get_logger(__name__)
 

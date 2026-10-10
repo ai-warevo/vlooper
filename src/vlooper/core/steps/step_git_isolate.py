@@ -3,9 +3,9 @@ from ..framework.context import TaskContext
 from ..framework.types import StepFn
 from vlooper.services.git_service import prepare_repository, setup_working_branch
 from vlooper.services.github_service import clone_repository_workflow
-from vlooper.config import config
+from vlooper.infra.config import config
 from vlooper.core.exceptions import VLooperError
-from vlooper.logger import get_logger
+from vlooper.infra.logger import get_logger
 
 
 logger = get_logger(__name__)

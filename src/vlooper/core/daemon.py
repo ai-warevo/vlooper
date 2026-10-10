@@ -6,9 +6,9 @@ import sys
 import time
 from typing import Any, Dict, Optional
 
-from vlooper.config import config
-from vlooper.database import Database
-from vlooper.logger import get_logger
+from vlooper.infra.config import config
+from vlooper.infra.database import Database
+from vlooper.infra.logger import get_logger
 from vlooper.core.scanner import Scanner
 
 # Framework imports

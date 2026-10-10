@@ -1,7 +1,7 @@
 from typing import Any
 from ..framework.context import TaskContext
 from ..framework.types import Middleware, NextFn
-from vlooper.logger import get_logger
+from vlooper.infra.logger import get_logger
 
 logger = get_logger(__name__)
 

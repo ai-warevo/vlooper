@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from vlooper.config import config
+from vlooper.infra.config import config
 
 
 class Database:

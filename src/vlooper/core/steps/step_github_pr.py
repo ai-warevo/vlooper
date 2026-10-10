@@ -2,7 +2,7 @@ from ..framework.context import TaskContext
 from ..framework.types import StepFn
 from vlooper.services.git_service import commit_and_push, quick_reset, delete_branch_workflow
 from vlooper.services.github_service import create_pull_request_workflow
-from vlooper.logger import get_logger
+from vlooper.infra.logger import get_logger
 
 logger = get_logger(__name__)
 

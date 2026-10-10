@@ -1,7 +1,7 @@
 from ..framework.context import TaskContext
-from vlooper.config import config
-from vlooper.logger import get_logger
-from vlooper.utils import run_command
+from vlooper.infra.config import config
+from vlooper.infra.logger import get_logger
+from vlooper.infra.utils import run_command
 
 logger = get_logger(__name__)
 
