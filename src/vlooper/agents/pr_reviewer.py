@@ -1,4 +1,5 @@
 import re
+import os
 from typing import Any, Dict
 from vlooper.core.framework.context import TaskContext
 from vlooper.infra.logger import get_logger
@@ -17,19 +18,23 @@ def pr_reviewer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
 
     # Prepare context for the LLM
     pr_info = ""
+    workspace_path = ctx.workspace_path
+    findings_file_abs = os.path.join(workspace_path, "review_findings.txt")
+    
     if ctx.pr_details:
         url = ctx.pr_details.get("html_url", "")
         pr_info = f"\n\nCONTEXT: You are reviewing Pull Request: {url}"
     
     action_instruction = (
         f"Your mission is to perform a professional code review of the current changes.\n"
+        f"**IMPORTANT: Your workspace directory is `{workspace_path}`**.\n\n"
         f"{pr_info}\n"
         "STEPS TO FOLLOW:\n"
         "1. Use `git diff` to see exactly what has changed in the workspace.\n"
         "2. Analyze the changes for bugs, security issues, or style inconsistencies.\n"
-        "3. If you find any issues, write them down clearly in a file named `review_findings.txt`.\n"
-        "4. Use the GitHub CLI to post these findings as comments on the Pull Request using the command:\n"
-        "   `gh pr review --comment -F review_findings.txt`\n"
+        f"3. Write your findings clearly into this EXACT file path: `{findings_file_abs}`\n"
+        f"4. Use the GitHub CLI to post these findings as comments on the Pull Request using this EXACT command:\n"
+        f"   `gh pr review --comment -F {findings_file_abs}`\n"
         "   (If you want to approve or request changes, use `--approve` or `--request-changes` flags instead of `--comment`).\n"
         "\n"
         "Once you have posted your comments/review via the CLI, provide a brief summary of what you did."

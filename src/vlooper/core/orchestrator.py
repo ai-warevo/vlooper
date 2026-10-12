@@ -124,6 +124,9 @@ class VLooperOrchestrator:
             },
         )
 
+        logger.debug("[CONTEXT_RECONSTRUCTION] Initial ctx for Task #%s: workspace=%s", 
+                     ctx.task_id, ctx.workspace_path)
+
         # Reconstruct context from previous completed steps to support retries/resumes
         try:
             for step in completed_steps:
@@ -135,27 +138,38 @@ class VLooperOrchestrator:
                 try:
                     output = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
                 except (json.JSONDecodeError, TypeError):
+                    logger.warning("[CONTEXT_RECONSTRUCTION] Step #%s has unparsable output.", step["id"])
                     continue
 
                 # Handle both direct dicts and "status/output" wrappers commonly used by agents
                 data_to_apply = output.get("output") if isinstance(output, dict) and "output" in output else output
 
                 if not isinstance(data_to_apply, dict):
+                    logger.debug("[CONTEXT_RECONSTRUCTION] Step #%s returned non-dict data: %s", step["id"], type(data_to_apply))
                     continue
 
                 # Apply updates to the context from step results
                 if "workspace_path" in data_to_apply:
                     ctx.workspace_path = str(data_to_apply["workspace_path"])
+                    logger.debug("[CONTEXT_RECONSTRUCTION] Step #%s updated workspace_path to %s", 
+                                 step["id"], ctx.workspace_path)
                 if "branch_name" in data_to_apply:
                     ctx.branch_name = str(data_to_apply["branch_name"])
+                    logger.debug("[CONTEXT_RECONSTRUCTION] Step #%s updated branch_name to %s", 
+                                 step["id"], ctx.branch_name)
                 if "repo_full_name" in data_to_apply:
                     ctx.repo_full_name = str(data_to_apply["repo_full_name"])
+                    logger.debug("[CONTEXT_RECONSTRUCTION] Step #%s updated repo_full_name to %s", 
+                                 step["id"], ctx.repo_full_name)
                 if "pr_details" in data_to_apply:
                     ctx.pr_details = data_to_apply["pr_details"]
-
+                    logger.debug("[CONTEXT_RECONSTRUCTION] Step #%s updated pr_details", step["id"])
+        
         except Exception as e:
             logger.error("Failed to reconstruct context from completed steps: %s", e)
 
+        logger.debug("[CONTEXT_RECONSTRUCTION] Final ctx for Task #%s: workspace=%s", 
+                     ctx.task_id, ctx.workspace_path)
         return ctx
 
     @contextlib.contextmanager
