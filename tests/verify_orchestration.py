@@ -9,7 +9,7 @@ sys.path.append(os.getcwd())
 from vlooper.config import config
 from vlooper.persistence.database import Database
 from vlooper.core.framework.role_registry import registry
-from vlooper.core.daemon import VLooperDaemon
+from vlooper.core.orchestrator import VLooperOrchestrator
 from vlooper.core.framework.context import TaskContext
 from vlooper.infra.logger import get_logger
 
@@ -55,10 +55,10 @@ def run_verification():
     db.add_step(task_id, "mock_role_2", 1) # Should receive output of step 1
     db.add_step(task_id, "mock_role_3", 2)
 
-    # 4. Run Daemon logic manually to verify each step sequentially
-    daemon = VLooperDaemon()
-    # Override daemon's DB with our test DB
-    daemon.db = db
+    # 4. Run Orchestrator logic manually to verify each step sequentially
+    orchestrator = VLooperOrchestrator()
+    # Override orchestrator's DB with our test DB
+    orchestrator.db = db
 
     print("[Execution] Manually triggering step processing...")
 
@@ -66,7 +66,7 @@ def run_verification():
     step1 = db.get_next_pending_step()
     assert step1 is not None, "Step 1 should be available"
     assert step1["role"] == "mock_role_1"
-    daemon._process_step(step1)
+    orchestrator._process_step(step1)
 
     # Verify Step 1 completion and data injection into Step 2
     with db._get_connection() as conn:
@@ -84,7 +84,7 @@ def run_verification():
     # Step 2 execution
     step2 = db.get_next_pending_step()
     assert step2 is not None, "Step 2 should be available"
-    daemon._process_step(step2)
+    orchestrator._process_step(step2)
 
     # Verify Step 2 completion and data injection into Step 3
     with db._get_connection() as conn:
@@ -102,7 +102,7 @@ def run_verification():
     # Step 3 execution
     step3 = db.get_next_pending_step()
     assert step3 is not None, "Step 3 should be available"
-    daemon._process_step(step3)
+    orchestrator._process_step(step3)
 
     # Verify Step 3 completion
     with db._get_connection() as conn:

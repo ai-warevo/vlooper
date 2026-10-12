@@ -20,9 +20,9 @@ This layer identifies work and defines the initial roadmap.
 * **Initial Planning:** Upon finding a task, the `SchedulerService` immediately generates a sequence of atomic steps (e.g., *issue_fetcher* $\rightarrow$ *git_isolator*) required to start the work.
 * **Reactive Re-planning:** The "Brain" of the system. If a step fails or returns critical feedback (like test failures), the `SchedulerService` can dynamically inject corrective steps (e.g., *test_healer*, *ai_fixer*) into the current task's queue.
 
-### 2. Execution & Orchestration Loop (`VLooperDaemon`, `RoleRegistry`, `Synthesizer`)
-The daemon operates as a continuous consumer of work from the database.
-* **Step-Based Processing:** The `VLooperDaemon` runs in an infinite loop, pulling individual **Steps** rather than entire tasks. This allows for high resilience; if a step fails, only that step (or its corrective successor) needs attention.
+### 2. Execution & Orchestration Loop (`VLooperOrchestrator`, `RoleRegistry`, `Synthesizer`)
+The orchestrator operates as a continuous consumer of work from the database.
+* **Step-Based Processing:** The `VLooperOrchestrator` runs in an infinite loop, pulling individual **Steps** rather than entire tasks. This allows for high resilience; if a step fails, only that step (or its corrective successor) needs attention.
 * **Role Registry:** To ensure loose coupling, agents are not hardcoded. Instead, the `RoleRegistry` maps role identifiers to specific executor functions (e.g., mapping "test_runner" to `test_runner_agent`).
 * **Context Synthesis:** The `Synthesizer` prepares high-signal "Mission Briefs" for each agent. It aggregates global task context, current step requirements, and the execution history of all previously completed steps into a single instruction set.
 
@@ -41,11 +41,11 @@ The database acts as the single source of truth, managing:
 
 | Pattern | Application in vLooper |
 | :--- | :--- |
-| **Producer-Consumer** | `Scanner` produces tasks $\rightarrow$ `Daemon` consumes atomic steps from the DB. |
+| **Producer-Consumer** | `Scanner` produces tasks $\rightarrow$ `Orchestrator` consumes atomic steps from the DB. |
 | **Reactive Planning** | The system dynamically modifies the task execution plan based on step outcomes. |
 | **Registry Pattern** | Decouples role names from their implementations via `RoleRegistry`. |
 | **Command / Step Pattern** | Encapsulates every discrete action into a trackable, idempotent database entry. |
 | **Synthesizer (Contextualization)** | Aggregates fragmented state/history into coherent instructions for LLM agents. |
 
 ## Summary
-The vLooper architecture is designed to be **highly resilient**, **massively parallelizable** (multiple daemons can process steps simultaneously), and **intrinsically adaptive** to the unpredictable nature of software debugging.
+The vLooper architecture is designed to be **highly resilient**, **massively parallelizable** (multiple orchestrators can process steps simultaneously), and **intrinsically adaptive** to the unpredictable nature of software debugging.

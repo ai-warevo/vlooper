@@ -67,7 +67,7 @@ def git_isolator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any
 
         setup_working_branch(repo_dir, branch_name, task_type=task_type)
 
-        # Update context (important for subsequent steps in the same execution run if the daemon uses it)
+        # Update context (important for subsequent steps in the same execution run if the orchestrator uses it)
         ctx.workspace_path = repo_dir
         ctx.branch_name = branch_name
         ctx.repo_full_name = full_name

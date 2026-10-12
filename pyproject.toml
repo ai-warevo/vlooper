@@ -1,7 +1,7 @@
 [project]
 name = "vlooper"
 version = "0.1.0"
-description = "AI Git-Flow automation daemon (vLooper)"
+description = "AI Git-Flow automation orchestrator (vLooper)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

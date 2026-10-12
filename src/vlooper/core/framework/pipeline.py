@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 class TaskPipeline:
     """
-    The core orchestration engine for the vLooper automation daemon.
+    The core orchestration engine for the vLooper orchestrator.
     It implements a pipeline architecture using middleware (onion layers)
     and sequential execution steps.
     """

@@ -8,7 +8,7 @@
 
 ---
 
-**vLooper** is a lightweight local automation daemon (Loop & Harness Engineering) that transforms the **Ollama + OpenCode** stack into an autonomous AI developer for GitHub organizations.
+**vLooper** is a lightweight local automation orchestrator (Loop & Harness Engineering) that transforms the **Ollama + OpenCode** stack into an autonomous AI developer for GitHub organizations.
 
 It scans organization-wide issues/PRs, pulls repositories locally, and runs a continuous "Write -> Test -> Fix" loop using `OpenCode` until the task is solved and a Pull Request is created.
 
@@ -18,7 +18,7 @@ It scans organization-wide issues/PRs, pulls repositories locally, and runs a co
 
 1.  **Trigger:** Create an Issue or PR in your organization and assign it to the bot.
 2.  **Discovery & Planning:** The `Scanner` identifies new tasks via GitHub CLI (`gh`). For each task, the `SchedulerService` immediately generates a sequence of atomic steps (e.g., *issue_fetcher* $\rightarrow$ *git_isolator*) stored in the database.
-3.  **Execution Loop:** The `Daemon` continuously pulls individual **Steps** from the DB. It identifies the correct agent via the `RoleRegistry` and executes it using a context-rich "Mission Brief" provided by the `Synthesizer`.
+3.  **Execution Loop:** The `Orchestrator` continuously pulls individual **Steps** from the DB. It identifies the correct agent via the `RoleRegistry` and executes it using a context-rich "Mission Brief" provided by the `Synthesizer`.
 4.  **Reactive Re-planning:** If a step fails (e.g., tests fail or linter errors are found), the `SchedulerService` can dynamically inject corrective steps (like *test_healer* or *ai_fixer*) into the task's queue to resolve the issue.
 5.  **Deliver:** Once all scheduled steps are completed successfully, the bot commits and pushes the branch, creating an automated **Pull Request**.
 
@@ -52,7 +52,7 @@ uv sync
 export GH_TOKEN=your_bot_token_here
 ```
 
-### 2. Running the Daemon
+### 2. Running the Orchestrator
 To start the core engine that scans and processes tasks:
 
 ```sh
@@ -78,7 +78,7 @@ To see what the agent is doing in real-time with a beautiful terminal interface,
 ```sh
 uv run vlooper-tui
 ```
-*Note: The TUI is only a viewer. You must have the daemon running in a separate window to see any activity.*
+*Note: The TUI is only a viewer. You must have the orchestrator running in a separate window to see any activity.*
 
 ---
 

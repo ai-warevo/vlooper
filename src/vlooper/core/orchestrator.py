@@ -1,4 +1,4 @@
-"""The main daemon process for vLooper."""
+"""The main orchestrator process for vLooper."""
 
 import contextlib
 import fcntl
@@ -53,14 +53,14 @@ from vlooper.agents import (
 logger = get_logger(__name__)
 
 
-class VLooperDaemon:
+class VLooperOrchestrator:
     """
-    The main daemon process for vLooper, responsible for polling for atomic steps
+    The main orchestrator process for vLooper, responsible for polling for atomic steps
     and executing them using specialized roles.
     """
 
     def __init__(self) -> None:
-        """Initializes the daemon internal state and bootstraps the registry."""
+        """Initializes the orchestrator internal state and bootstraps the registry."""
         # Infrastructure layers
         self.db = Database()
         self.scanner = Scanner(self.db)
@@ -118,7 +118,7 @@ class VLooperDaemon:
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
-        logger.info("\nStopping daemon...")
+        logger.info("\nStopping orchestrator...")
         self.running = False
 
     def _map_task_to_context(self, task: dict[str, Any]) -> TaskContext:
@@ -229,7 +229,7 @@ class VLooperDaemon:
             )
 
     def _execute_loop(self, retry_failed: bool) -> None:
-        """The main operational loop of the daemon."""
+        """The main operational loop of the orchestrator."""
         while self.running:
             try:
                 # Try to get next step (pending or failed)
@@ -249,7 +249,7 @@ class VLooperDaemon:
                 time.sleep(0.5)
 
             except Exception:
-                logger.exception("Unexpected error in daemon loop")
+                logger.exception("Unexpected error in orchestrator loop")
                 time.sleep(config.timeouts.error_wait_seconds)
 
     def run(self, retry_failed: bool = False) -> None:
@@ -257,18 +257,18 @@ class VLooperDaemon:
         try:
             with self._lock_context():
                 mode = "RETRY" if retry_failed else "NORMAL"
-                logger.info("vLooper Daemon started in %s mode.", mode)
+                logger.info("vLooper Orchestrator started in %s mode.", mode)
                 self._execute_loop(retry_failed)
-                logger.info("Daemon shut down.")
+                logger.info("Orchestrator shut down.")
 
         except Exception:
-            logger.exception("Fatal error in daemon")
+            logger.exception("Fatal error in orchestrator")
 
 
 def main(retry_failed: bool = False) -> None:
-    """Entry point for the daemon."""
-    daemon = VLooperDaemon()
-    daemon.run(retry_failed=retry_failed)
+    """Entry point for the orchestrator."""
+    orchestrator = VLooperOrchestrator()
+    orchestrator.run(retry_failed=retry_failed)
 
 
 if __name__ == "__main__":
