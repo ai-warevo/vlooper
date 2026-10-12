@@ -42,6 +42,17 @@ from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_github_pr import github_create_pull_request
 from vlooper.core.steps.step_run_tests import run_repository_tests
 
+# Import new specialized agents
+from vlooper.agents import (
+    linter_bot_executor,
+    coverage_booster_executor,
+    test_healer_executor,
+    review_fixer_executor,
+    pr_reviewer_executor,
+    github_pr_creator_executor,
+)
+
+
 logger = get_logger(__name__)
 
 
@@ -107,6 +118,14 @@ class VLooperDaemon:
         registry.register("test_runner", wrap_legacy(run_repository_tests))
         registry.register("ai_fixer", wrap_legacy(apply_ai_fix))
         registry.register("pr_creator", wrap_legacy(github_create_pull_request))
+
+        # New specialized agents (returning direct dicts)
+        registry.register("linter_bot", linter_bot_executor)
+        registry.register("coverage_booster", coverage_booster_executor)
+        registry.register("test_healer", test_healer_executor)
+        registry.register("review_fixer", review_fixer_executor)
+        registry.register("pr_reviewer", pr_reviewer_executor)
+        registry.register("github_pr_creator", github_pr_creator_executor)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
