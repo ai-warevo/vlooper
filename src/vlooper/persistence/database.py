@@ -226,7 +226,31 @@ updated_at = CURRENT_TIMESTAMP
             return [dict(row) for row in cursor.fetchall()]
 
     def get_next_pending_step(self) -> dict[str, Any] | None:
-        pass
+        """Retrieve and claim the next pending step atomically."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conn.execute(
+                    "SELECT * FROM tasks_steps WHERE status = 'PENDING' ORDER BY order_index ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    step_id = row['id']
+                    conn.execute(
+                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (step_id,)
+                    )
+                    conn.commit()
+                    row_dict = dict(row)
+                    row_dict['status'] = 'RUNNING'
+                    return row_dict
+                else:
+                    conn.rollback()
+                    return None
+            except Exception as e:
+                conn.rollback()
+                raise e
 
     def get_next_failed_step(self) -> dict[str, Any] | None:
         """Retrieve and claim the next failed step atomically."""

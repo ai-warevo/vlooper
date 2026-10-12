@@ -234,6 +234,10 @@ class VLooperOrchestrator:
         """The main operational loop of the orchestrator."""
         while self.running:
             try:
+                # Periodically scan for new tasks
+                logger.debug("Performing periodic scan for new tasks...")
+                self.scanner.scan(retry_failed=retry_failed)
+
                 # Try to get next step (pending or failed)
                 if retry_failed:
                     step = self.db.get_next_failed_step()
