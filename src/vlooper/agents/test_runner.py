@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
+from vlooper.infra.utils import filter_test_logs
 
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.events import EventName
@@ -39,11 +40,12 @@ def test_runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
         )
 
         exit_code = result.returncode
-        logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        raw_logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        filtered_logs = filter_test_logs(raw_logs)
 
         # Update context
         ctx.exit_code = exit_code
-        ctx.error_logs = logs
+        ctx.error_logs = filtered_logs
 
         if exit_code == 0:
             logger.info("[TEST_RUNNER] Tests passed successfully.")
@@ -55,7 +57,7 @@ def test_runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
                 "status": "success",
                 "output": {
                     "exit_code": exit_code,
-                    "logs": logs
+                    "logs": filtered_logs
                 }
             }
         else:
@@ -64,7 +66,7 @@ def test_runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
                 "status": "failed",
                 "output": {
                     "exit_code": exit_code,
-                    "logs": logs
+                    "logs": filtered_logs
                 }
             }
 
