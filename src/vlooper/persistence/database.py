@@ -1,5 +1,6 @@
 """Database management for vLooper."""
 
+import json
 import sqlite3
 from typing import Any
 
@@ -25,7 +26,7 @@ class Database:
         """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
 
-    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name):
+    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name, meta: str | None = None):
         """Add a new task to the database."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
@@ -35,10 +36,10 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, 
-                                   branch_name, status)
-                VALUES (?, ?, ?, ?, ?, 'PENDING')
+                                   branch_name, status, meta)
+                VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
             """,
-                (task_type, repo_full_name, repo_url, issue_number, branch_name),
+                (task_type, repo_full_name, repo_url, issue_number, branch_name, meta),
             )
             conn.commit()
         return True
@@ -165,3 +166,73 @@ updated_at = CURRENT_TIMESTAMP
                 (repo_full_name, branch_name),
             )
             return cursor.fetchone() is not None
+
+    def add_step(self, task_id: int, role: str, order_index: int, input_data: dict | None = None):
+        """Add a new step to a task."""
+        input_json = json.dumps(input_data) if input_data else None
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO tasks_steps (task_id, role, status, order_index, input_data)
+                VALUES (?, ?, 'PENDING', ?, ?)
+            """,
+                (task_id, role, order_index, input_json),
+            )
+            conn.commit()
+
+    def get_next_pending_step(self) -> dict[str, Any] | None:
+        """Retrieve and claim the next pending step atomically."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            # SQLite doesn't have a native 'SELECT FOR UPDATE', so we use BEGIN IMMEDIATE 
+            # to lock the database for this transaction.
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conn.execute(
+                    "SELECT * FROM tasks_steps WHERE status = 'PENDING' ORDER BY order_index ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    step_id = row['id']
+                    conn.execute(
+                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (step_id,)
+                    )
+                    conn.commit()
+                    row_dict = dict(row)
+                    row_dict['status'] = 'RUNNING'
+                    return row_dict
+                else:
+                    conn.rollback()
+                    return None
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    def complete_step(self, step_id: int, output_data: dict | None = None):
+        """Mark a step as completed."""
+        output_json = json.dumps(output_data) if output_data else None
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE tasks_steps 
+                SET status = 'COMPLETED', output_data = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """,
+                (output_json, step_id),
+            )
+            conn.commit()
+
+    def fail_step(self, step_id: int, error_msg: str):
+        """Mark a step as failed."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE tasks_steps 
+                SET status = 'FAILED', error = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """,
+                (error_msg, step_id),
+            )
+            conn.commit()
+
