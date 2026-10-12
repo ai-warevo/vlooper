@@ -35,15 +35,12 @@ from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 from vlooper.services.scheduler_service import SchedulerService
 
-# Import existing step functions to wrap them as roles
-from vlooper.core.steps.step_apply_fix import apply_ai_fix
-from vlooper.core.steps.step_fetch_issue import fetch_issue_context
-from vlooper.core.steps.step_git_isolate import git_isolate_repository
-from vlooper.core.steps.step_github_pr import github_create_pull_request
-from vlooper.core.steps.step_run_tests import run_repository_tests
-
-# Import new specialized agents
+# Import specialized agents
 from vlooper.agents import (
+    git_isolator_agent,
+    issue_fetcher_agent,
+    test_runner_agent,
+    ai_fixer_agent,
     linter_bot_executor,
     coverage_booster_executor,
     test_healer_executor,
@@ -102,22 +99,14 @@ class VLooperDaemon:
         signal.signal(signal.SIGTERM, self._handle_exit)
 
     def _bootstrap_roles(self) -> None:
-        """Registers the existing step functions as roles in the registry."""
+        """Registers the agents in the registry."""
         logger.info("Bootstrapping role registry...")
 
-        # Helper to wrap old-style StepFn (Callable[[TaskContext], None]) 
-        # into new RoleExecutor (Callable[[TaskContext, Dict], Dict])
-        def wrap_legacy(func):
-            def wrapper(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
-                func(ctx)
-                return {}  # Return empty dict as output data
-            return wrapper
-
-        registry.register("git_isolator", wrap_legacy(git_isolate_repository))
-        registry.register("issue_fetcher", wrap_legacy(fetch_issue_context))
-        registry.register("test_runner", wrap_legacy(run_repository_tests))
-        registry.register("ai_fixer", wrap_legacy(apply_ai_fix))
-        registry.register("pr_creator", wrap_legacy(github_create_pull_request))
+        registry.register("git_isolator", git_isolator_agent)
+        registry.register("issue_fetcher", issue_fetcher_agent)
+        registry.register("test_runner", test_runner_agent)
+        registry.register("ai_fixer", ai_fixer_agent)
+        registry.register("pr_creator", github_pr_creator_executor) # Using the new agent for pr_creator
 
         # New specialized agents (returning direct dicts)
         registry.register("linter_bot", linter_bot_executor)

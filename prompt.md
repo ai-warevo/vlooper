@@ -1,3 +1,6 @@
+X=5
+PHASE_NAME=agent_migration
+
 # Role: Senior Software Engineer / Architect
 
 ## Context
