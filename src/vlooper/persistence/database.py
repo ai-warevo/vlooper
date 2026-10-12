@@ -26,14 +26,14 @@ class Database:
         """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
 
-    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name, meta: str | None = None):
-        """Add a new task to the database."""
+    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name, meta: str | None = None) -> int | None:
+        """Add a new task to the database. Returns the new task ID or None if it already exists."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
-            return False
+            return None
 
         with self._get_connection() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, 
                                    branch_name, status, meta)
@@ -42,7 +42,7 @@ class Database:
                 (task_type, repo_full_name, repo_url, issue_number, branch_name, meta),
             )
             conn.commit()
-        return True
+            return cursor.lastrowid
 
     def get_next_pending_task(self) -> dict[str, Any] | None:
         """Retrieve a single pending task."""
@@ -210,34 +210,21 @@ updated_at = CURRENT_TIMESTAMP
             )
             conn.commit()
 
-    def get_next_pending_step(self) -> dict[str, Any] | None:
-        """Retrieve and claim the next pending step atomically."""
+    def get_task_steps(self, task_id: int) -> list[dict[str, Any]]:
+        """Retrieve all steps for a given task."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            # SQLite doesn't have a native 'SELECT FOR UPDATE', so we use BEGIN IMMEDIATE 
-            # to lock the database for this transaction.
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                cursor = conn.execute(
-                    "SELECT * FROM tasks_steps WHERE status = 'PENDING' ORDER BY order_index ASC LIMIT 1"
-                )
-                row = cursor.fetchone()
-                if row:
-                    step_id = row['id']
-                    conn.execute(
-                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (step_id,)
-                    )
-                    conn.commit()
-                    row_dict = dict(row)
-                    row_dict['status'] = 'RUNNING'
-                    return row_dict
-                else:
-                    conn.rollback()
-                    return None
-            except Exception as e:
-                conn.rollback()
-                raise e
+            cursor = conn.execute("SELECT * FROM tasks_steps WHERE task_id = ? ORDER BY order_index ASC", (task_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_completed_steps_for_task(self, task_id: int) -> list[dict[str, Any]]:
+        """Retrieve all completed steps for a given task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks_steps WHERE task_id = ? AND status = 'COMPLETED' ORDER BY order_index ASC", (task_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_next_pending_step(self) -> dict[str, Any] | None:
 
     def get_next_failed_step(self) -> dict[str, Any] | None:
         """Retrieve and claim the next failed step atomically."""

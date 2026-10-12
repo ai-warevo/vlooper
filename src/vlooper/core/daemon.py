@@ -33,6 +33,7 @@ from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
 from vlooper.core.scanner import Scanner
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
+from vlooper.services.scheduler_service import SchedulerService
 
 # Import existing step functions to wrap them as roles
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
@@ -57,6 +58,7 @@ class VLooperDaemon:
         self.scanner = Scanner(self.db)
         self.event_bus = EventBus()
         self.synthesizer = Synthesizer()
+        self.scheduler = SchedulerService(self.db)
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
 
@@ -169,8 +171,9 @@ class VLooperDaemon:
             self.db.fail_step(int(step["id"]), "Invalid input JSON")
             return
 
-        # Prepare Mission Brief via Synthesizer
-        brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data)
+        # Prepare Mission Brief via Synthesizer with History
+        history = self.db.get_completed_steps_for_task(int(step["task_id"]))
+        brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data, history=history)
 
         try:
             logger.info("[STEP] Executing role '%s' for task #%s (Step ID: %s)", 
@@ -193,13 +196,13 @@ class VLooperDaemon:
                 # Check if task is finished (no more PENDING/RUNNING steps)
                 # For simplicity in this phase, we check by seeing if there were any 
                 # non-completed steps remaining.
-                # In a production system, we'd have a more robust way to signal task completion.
                 logger.info("[TASK] All steps for Task #%s appear to be finished.", ctx.task_id)
-                # We might want to emit TASK_FINISHED here if all steps are done.
 
         except Exception as e:
             logger.exception("Error during execution of role '%s'", role_name)
             self.db.fail_step(int(step["id"]), str(e))
+            # Reactive Re-planning Trigger
+            self.scheduler.react_to_step_failure(int(step["id"]), int(step["task_id"]), role_name, str(e))
 
     def _execute_loop(self, retry_failed: bool) -> None:
         """The main operational loop of the daemon."""

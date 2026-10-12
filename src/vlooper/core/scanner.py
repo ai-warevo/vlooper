@@ -1,11 +1,12 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
-from typing import Any
-
+from typing import Any, Dict, Optional
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 from vlooper.services.github_service import get_assigned_items, get_github_item
+from vlooper.services.scheduler_service import SchedulerService
+
 
 logger = get_logger(__name__)
 
@@ -13,9 +14,10 @@ logger = get_logger(__name__)
 class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
 
-    def __init__(self, db: Database):
-        """Initialize the scanner with a database instance."""
+    def __init__(self, db: Database, scheduler: SchedulerService) -> None:
+        """Initialize the scanner with a database instance and scheduler."""
         self.db = db
+        self.scheduler = scheduler
 
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
@@ -126,13 +128,26 @@ class Scanner:  # pylint: disable=too-few-public-methods
             repo_full_name,
             branch,
         )
-        self.db.add_task(
+        
+        # Add the task to DB and get its ID
+        task_id = self.db.add_task(
             config_data["db_type"],
             repo_full_name,
             f"https://github.com/{repo_full_name}",
             num,
             branch,
         )
+
+        if task_id:
+            # Once added, immediately plan the initial steps for it
+            issue_data = {
+                "issue_number": num,
+                "repo_full_name": repo_full_name,
+                "is_pr": is_pr
+            }
+            self.scheduler.plan_initial_steps(task_id, issue_data)
+        else:
+            logger.debug("Task #%s already exists or failed to add.", num)
 
     def _resolve_branch_name(
         self, num: int, repo_full_name: str, is_pr: bool
