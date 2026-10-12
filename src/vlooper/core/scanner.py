@@ -1,6 +1,6 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
