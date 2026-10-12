@@ -88,10 +88,12 @@ class SchedulerService:
         elif status == "success":
             if role == "pr_reviewer":
                 # Check if the PR review output contains critical feedback indicators
+                logs_text = str(output.get("logs", "")).upper()
                 is_critical = (
                     output.get("critical_feedback") is True or 
-                    "REJECTED" in str(output).upper() or
-                    "CHANGES_REQUESTED" in str(output).upper()
+                    "REJECTED" in logs_text or
+                    "REQUEST CHANGES" in logs_text or
+                    "CHANGES REQUESTED" in logs_text
                 )
                 if is_critical:
                     logger.info("[SCHEDULER] PR Reviewer reported critical feedback. Injecting 'review_fixer' step.")
