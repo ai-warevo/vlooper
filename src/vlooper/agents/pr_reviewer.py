@@ -33,10 +33,12 @@ def pr_reviewer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
         "1. Use `git diff` to see exactly what has changed in the workspace.\n"
         "2. Analyze the changes for bugs, security issues, or style inconsistencies.\n"
         f"3. Write your findings clearly into this EXACT file path: `{findings_file_abs}`\n"
-        f"4. Use the GitHub CLI to post these findings as comments on the Pull Request using this EXACT command:\n"
-        f"   `gh pr review --comment -F {findings_file_abs}`\n"
-        "   (If you want to approve or request changes, use `--approve` or `--request-changes` flags instead of `--comment`).\n"
+        "4. **CRITICAL: You MUST select the correct GitHub CLI flag based on your conclusion:**\n"
+        "   - If you decide to APPROVE the PR $\rightarrow$ use command: `gh pr review --approve -F {findings_file_abs}`\n"
+        "   - If you decide to REQUEST CHANGES $\rightarrow$ use command: `gh pr review --request-changes -F {findings_file_abs}`\n"
+        "   - For any other type of feedback (comment only) $\rightarrow$ use command: `gh pr review --comment -F {findings_file_abs}`\n"
         "\n"
+        "Your verdict in the text MUST match the flag you use in the CLI command.\n"
         "Once you have posted your comments/review via the CLI, provide a brief summary of what you did."
     )
 
