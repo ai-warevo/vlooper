@@ -1,0 +1,12 @@
+# Code Review Findings for Pull Request #35
+
+## 🐛 Bugs
+- **SQL Syntax Issue**: In `src/vlooper/persistence/database.py` within the `fail_task` method, there is a trailing backslash (`\`) at the end of one of the SQL lines inside the triple-quoted string. This could lead to syntax errors in some SQLite drivers or be interpreted literally as part of the query.
+
+## 💡 Suggestions & Design Improvements
+- **Brittle Regex/String Matching**: In `src/vlooper/services/scheduler_service.py`, the logic to detect critical PR feedback (`is_critical`) relies on searching for keywords like `"REJECTED"` in a stringified version of the agent's output. This is brittle and highly sensitive to any changes in the LLM's response format or verbosity. **Recommendation**: Use structured data (e.g., a JSON field with an explicit `critical_feedback: bool`) from the agent's output instead.
+- **Granular Retry Control**: Currently, loop prevention for steps is handled via a global task-wide step limit in `SchedulerService` (15 steps), because the `tasks_steps` table lacks a `retries` column. While this works, it limits flexibility (a single problematic step could consume the entire budget). **Recommendation**: Add a `retries` column to the `tasks_steps` table to allow individual steps to be retried more effectively before triggering task-wide escalation or failure.
+
+## 📝 Observations
+- The use of `BEGIN IMMEDIATE` in `get_next_pending_step` and `get_next_failed_step` for atomic "claim" operations is an excellent choice for maintaining database integrity under concurrency in SQLite.
+- The strategy of using large spacing (multiples of 1000) for initial task steps in the `SchedulerService` is a clever way to allow for reactive step insertion without needing complex index shifts.
