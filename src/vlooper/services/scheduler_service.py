@@ -21,16 +21,8 @@ class SchedulerService:
     def plan_initial_steps(self, task_id: int, issue_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Analyzes a new issue and generates an initial sequence of Steps in the database.
-        
-        In a full implementation, this would call an LLM to decide the sequence of roles.
-        For now, we use a default standard sequence for most issues.
         """
         logger.info("Planning initial steps for Task #%s", task_id)
-        
-        # Standard initial pipeline: 
-        # 1. issue_fetcher (to get more context if needed)
-        # 2. git_isolator (to prepare workspace)
-        # 3. text_runner (initial test run to see status) -- actually maybe not, let's start with fetcher and isolator.
         
         steps = [
             {"role": "issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
@@ -48,38 +40,62 @@ class SchedulerService:
         logger.info("Successfully injected %d initial steps for Task #%s", len(steps), task_id)
         return steps
 
-    def react_to_step_failure(self, step_id: int, task_id: int, role: str, error_msg: str) -> bool:
+    def react_to_step_outcome(self, step_id: int, task_id: int, role: str, order_index: int, outcome: Dict[str, Any]) -> bool:
         """
-        Reactive Re-planning: if a specific role fails, inject a corrective step.
+        Reactive Re-planning: if a specific role fails or provides negative feedback, inject a corrective step.
         
         Returns True if a corrective step was injected, False otherwise.
         """
-        logger.info("Evaluating reactive re-planning for failed step #%s (Role: %s)", step_id, role)
+        logger.info("Evaluating reactive re-planning for step #%s (Role: %s) with outcome status: %s", 
+                    step_id, role, outcome.get("status"))
 
-        # Determine the last successful step index to place the new one correctly
+        # Retrieve all steps to check loop prevention and find insertion point
         all_steps = self.db.get_task_steps(task_id)
         if not all_steps:
             return False
 
-        # Find the max order index currently in the system for this task
-        max_idx = max(s["order_index"] for s in all_steps)
-        
-        # Logic for corrective steps:
-        new_step: Optional[Dict[str, Any]] = None
+        # Loop prevention: Limit the number of corrective/total steps in a task lifecycle
+        # A reasonable limit for this phase is 15 steps to prevent infinite loops.
+        if len(all_steps) > 15:
+            logger.warning("[SCHEDULER] Task #%s has exceeded step limit (%d). Skipping reactive injection.", task_id, len(all_steps))
+            return False
 
-        if role == "test_runner":
-            logger.info("[SCHEDULER] Test failure detected. Injecting 'ai_fixer' step.")
-            new_step = {
-                "role": "ai_fixer",
-                "input_data": {"error_context": error_msg}
-            }
-        elif role == "ai_fixer" and "syntax" in error_msg.lower():
-             # If the AI fixer itself fails due to syntax, maybe we need a linter (if we had one)
-             pass
+        new_step: Optional[Dict[str, Any]] = None
+        status = outcome.get("status")
+        output = outcome.get("output", {})
+        
+        # Pattern Mapping logic
+        if status in ["failed", "error"]:
+            if role == "test_runner":
+                logger.info("[SCHEDULER] Test failure detected. Injecting 'test_healer' step.")
+                new_step = {
+                    "role": "test_healer",
+                    "input_data": {"context": str(output)}
+                }
+            elif role == "linter_bot":
+                logger.info("[SCHEDULER] Linter errors detected. Injecting 'ai_fixer' step.")
+                new_step = {
+                    "role": "ai_fixer",
+                    "input_data": {"context": str(output)}
+                }
+        elif status == "success":
+            if role == "pr_reviewer":
+                # Check if the PR review output contains critical feedback indicators
+                is_critical = (
+                    output.get("critical_feedback") is True or 
+                    "REJECTED" in str(output).upper() or
+                    "CHANGES_REQUESTED" in str(output).upper()
+                )
+                if is_critical:
+                    logger.info("[SCHEDULER] PR Reviewer reported critical feedback. Injecting 'review_fixer' step.")
+                    new_step = {
+                        "role": "review_fixer",
+                        "input_data": {"context": str(output)}
+                    }
 
         if new_step:
-            # Inject it right after the current index or at the end? 
-            # Usually we want it to be part of the flow. Let's put it as the next step.
+            # Insert the corrective step as the next in line (highest order index + 1)
+            max_idx = max(s["order_index"] for s in all_steps)
             self.db.add_step(
                 task_id=task_id,
                 role=new_step["role"],
@@ -90,4 +106,8 @@ class SchedulerService:
             return True
 
         return False
+
+    def react_to_step_failure(self, step_id: int, task_id: int, role: str, error_msg: str) -> bool:
+        """Legacy shim for backward compatibility (mapping to react_to_step_outcome)."""
+        return self.react_to_step_outcome(step_id, task_id, role, 0, {"status": "error", "error_message": error_msg})
 

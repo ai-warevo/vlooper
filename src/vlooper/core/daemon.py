@@ -194,6 +194,16 @@ class VLooperDaemon:
             self.db.complete_step(int(step["id"]), output_data=result)
             logger.info("[STEP] Role '%s' completed successfully.", role_name)
 
+            # Reactive Re-planning Trigger for successful executions that contain failure metadata
+            if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
+                self.scheduler.react_to_step_outcome(
+                    int(step["id"]), 
+                    int(step["task_id"]), 
+                    role_name, 
+                    step["order_index"], 
+                    result
+                )
+
             # Data Flow: Inject result into next step for this task, if it exists
             next_step = self.db.get_next_step_for_task(int(step["task_id"]), step["order_index"])
             if next_step:
@@ -209,8 +219,14 @@ class VLooperDaemon:
         except Exception as e:
             logger.exception("Error during execution of role '%s'", role_name)
             self.db.fail_step(int(step["id"]), str(e))
-            # Reactive Re-planning Trigger
-            self.scheduler.react_to_step_failure(int(step["id"]), int(step["task_id"]), role_name, str(e))
+            # Reactive Re-planning Trigger for actual exceptions
+            self.scheduler.react_to_step_outcome(
+                int(step["id"]), 
+                int(step["task_id"]), 
+                role_name, 
+                step["order_index"], 
+                {"status": "error", "error_message": str(e)}
+            )
 
     def _execute_loop(self, retry_failed: bool) -> None:
         """The main operational loop of the daemon."""

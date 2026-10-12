@@ -197,11 +197,11 @@ updated_at = CURRENT_TIMESTAMP
             )
             return cursor.fetchone() is not None
 
-    def add_step(self, task_id: int, role: str, order_index: int, input_data: dict | None = None):
+    def add_step(self, task_id: int, role: str, order_index: int, input_data: dict | None = None) -> int:
         """Add a new step to a task."""
         input_json = json.dumps(input_data) if input_data else None
         with self._get_connection() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO tasks_steps (task_id, role, status, order_index, input_data)
                 VALUES (?, ?, 'PENDING', ?, ?)
@@ -209,6 +209,7 @@ updated_at = CURRENT_TIMESTAMP
                 (task_id, role, order_index, input_json),
             )
             conn.commit()
+            return cursor.lastrowid
 
     def get_task_steps(self, task_id: int) -> list[dict[str, Any]]:
         """Retrieve all steps for a given task."""
@@ -225,6 +226,7 @@ updated_at = CURRENT_TIMESTAMP
             return [dict(row) for row in cursor.fetchall()]
 
     def get_next_pending_step(self) -> dict[str, Any] | None:
+        pass
 
     def get_next_failed_step(self) -> dict[str, Any] | None:
         """Retrieve and claim the next failed step atomically."""
