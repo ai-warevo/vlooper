@@ -9,9 +9,12 @@ In this new paradigm:
 3.  Each step is executed by a specialized functional **Role**.
 
 ## Reference Documents
-You MUST read both files before performing any actions:
+You MUST read following files before performing any actions:
 1.  **Master Specification (Global Architecture):** `docs/subagents/global.md`
 2.  **Phase Instructions:** `docs/subagents/phase_[X]_[PHASE_NAME].md` *(Note to user: Replace [X] and [PHASE_NAME] with the current phase number and its name)*
+
+*Optional:*
+- **Migration Roadmap:** `docs/subagents/migration_roadmap.md`. Read this if you need context on the overall architectural evolution or if your task is part of a broader migration strategy.
 
 ## Your Task
 Your goal is to implement **Phase [X]: [PHASE_NAME]**.
