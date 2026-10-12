@@ -8,7 +8,7 @@ from vlooper.services.github_service import get_github_author, post_github_comme
 logger = get_logger(__name__)
 
 
-class GitHubNotificationHandler:
+class TaskCompletionHandler:
     """Handles posting summary comments to GitHub issues/PRs after pipeline completion."""
 
     def handle(self, ctx: Any) -> None:
@@ -33,16 +33,15 @@ class GitHubNotificationHandler:
             mention = f"@{author} " if author and author != "assignee" else ""
 
             if ctx.exit_code == 0:
-                # Successful completion
+                # Successful completion WITHOUT a PR
+                if hasattr(ctx, "pr_details") and ctx.pr_details:
+                    logger.info("PR already handled by PrCreatedHandler, skipping comment.")
+                    return
+
                 message = (
                     f"{mention} **vLooper Automation Complete!**\n\n"
-                    "The automated fix has been applied and a Pull Request "
-                    "has been created."
+                    "The automated fix has been applied."
                 )
-                if hasattr(ctx, "pr_details") and ctx.pr_details:
-                    url = ctx.pr_details.get("html_url", "")
-                    if url:
-                        message += f"\n\n**Pull Request:** {url}"
 
                 logger.info("Posting success comment to GitHub...")
                 post_github_comment(task_data, message)

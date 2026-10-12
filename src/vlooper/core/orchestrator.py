@@ -11,8 +11,8 @@ from typing import Any, Dict
 from vlooper.config import config
 from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
 from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
-from vlooper.core.event_handlers.github_notification_handler import (
-    GitHubNotificationHandler,
+from vlooper.core.event_handlers.task_completion_handler import (
+    TaskCompletionHandler,
 )
 from vlooper.core.event_handlers.github_pickup_handler import GitHubPickupHandler
 from vlooper.core.event_handlers.pr_created_handler import PrCreatedHandler
@@ -72,7 +72,7 @@ class VLooperOrchestrator:
 
         # Register post-step task handlers via EventBus (maintaining compatibility)
         status_handler = TaskStatusHandler(self.db)
-        github_handler = GitHubNotificationHandler()
+        github_handler = TaskCompletionHandler()
         github_pickup_handler = GitHubPickupHandler()
         git_isolated_handler = GitIsolatedHandler()
         test_passed_handler = TestPassedHandler()
@@ -198,6 +198,8 @@ class VLooperOrchestrator:
                     ctx.branch_name = str(data_to_apply["branch_name"])
                 if "repo_full_name" in data_to_apply:
                     ctx.repo_full_name = str(data_to_apply["repo_full_name"])
+                if "pr_details" in data_to_apply:
+                    ctx.pr_details = data_to_apply["pr_details"]
 
         except Exception as e:
             logger.error("Failed to reconstruct context from completed steps: %s", e)
