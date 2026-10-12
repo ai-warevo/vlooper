@@ -89,7 +89,25 @@ class VLooperOrchestrator:
 
         # Handle newly discovered tasks
         def handle_task_discovered(data: dict[str, Any]) -> None:
-            self.scheduler.plan_initial_steps(data["task_id"], data["issue_data"])
+            task_id = data["task_id"]
+            if self.db.claim_task(task_id):
+                self.scheduler.plan_initial_steps(task_id, data["issue_data"])
+                
+                # Notify that the task has been picked up (once per task)
+                task = self.db.get_task_by_id(task_id)
+                if task:
+                    ctx = TaskContext(
+                        task_id=str(task["id"]),
+                        issue_number=int(task["issue_number"]) if task["issue_number"] else 0,
+                        repo_url=task["repo_url"],
+                        workspace_path=".", 
+                        repo_full_name=task.get("repo_full_name"),
+                        branch_name=task.get("branch_name"),
+                        metadata={
+                            "original_task": task,
+                        }
+                    )
+                    self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
 
         self.event_bus.subscribe(EventName.TASK_DISCOVERED, handle_task_discovered)
 
@@ -220,10 +238,6 @@ class VLooperOrchestrator:
         brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data, history=history)
 
         try:
-            self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
-            logger.info("[STEP] Executing role '%s' for task #%s (Step ID: %s)", 
-                        role_name, ctx.task_id, step["id"])
-            
             # Execute the specialized role function
             result = executor(ctx, brief)
 
