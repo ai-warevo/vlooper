@@ -98,6 +98,7 @@ class VLooperOrchestrator:
                 if task:
                     ctx = TaskContext(
                         task_id=str(task["id"]),
+                        task_type=task.get("task_type", "ISSUE"),
                         issue_number=int(task["issue_number"]) if task["issue_number"] else 0,
                         repo_url=task["repo_url"],
                         workspace_path=".", 
