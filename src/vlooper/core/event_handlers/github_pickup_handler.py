@@ -13,22 +13,15 @@ class GitHubPickupHandler:
 
     def handle(self, ctx: Any) -> None:
         """Posts a pickup comment to the GitHub issue/PR."""
-        # Extract original task data from context
-        task = ctx.metadata.get("original_task")
-        if not task:
-            logger.warning("Cannot post pickup comment: no original task in context.")
-            return
+        # Extract task data for the helper function
+        task_data = {
+            "repo_full_name": ctx.repo_full_name,
+            "task_type": ctx.task_type,
+            "branch_name": ctx.branch_name,  # Might be None
+            "issue_number": ctx.issue_number,
+        }
 
         try:
-            # Construct task data for the helper function
-            # We use the actual task dict which has issue_number/branch_name
-            task_data = {
-                "repo_full_name": task["repo_full_name"],
-                "task_type": task["task_type"],
-                "branch_name": ctx.branch_name,  # Might be None
-                "issue_number": task["issue_number"],
-            }
-
             # Fetch author to mention them
             author = get_github_author(task_data)
             mention = f"@{author} " if author and author != "assignee" else ""

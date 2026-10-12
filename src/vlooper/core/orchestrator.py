@@ -145,8 +145,18 @@ class VLooperOrchestrator:
         """Maps a raw database task record into an isolated TaskContext instance.
         Uses completed_steps to reconstruct the context state (workspace, branch, etc.).
         """
+        # Parse meta if available
+        meta = {}
+        if task.get("meta"):
+            try:
+                import json
+                meta = json.loads(task["meta"])
+            except Exception:
+                logger.warning("Failed to parse task meta for Task #%s", task["id"])
+
         ctx = TaskContext(
             task_id=str(task["id"]),
+            task_type=task.get("task_type", "ISSUE"),
             issue_number=(
                 int(task["issue_number"]) if task["issue_number"] is not None else 0
             ),
@@ -154,9 +164,11 @@ class VLooperOrchestrator:
             workspace_path=str(task.get("workspace_path", ".")),
             repo_full_name=task.get("repo_full_name"),
             branch_name=task.get("branch_name"),
+            status=task.get("status", "PENDING"),
+            issue_title=meta.get("issue_title"),
+            issue_body=meta.get("issue_body"),
             metadata={
-                "event_bus": self.event_bus,  # Required for steps to emit events
-                "original_task": task,  # Preserve original record if needed
+                "event_bus": self.event_bus,
             },
         )
 

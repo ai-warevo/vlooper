@@ -22,7 +22,7 @@ def git_isolator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any
     logger.info("[GIT_ISOLATOR] Starting repository isolation...")
 
     # Identify task type from original record (passed via metadata in context)
-    task_type = ctx.metadata.get("original_task", {}).get("task_type", "ISSUE")
+    task_type = ctx.task_type
     
     try:
         # We can use the brief or the context. Let's rely on context as before but honor the structure.

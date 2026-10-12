@@ -55,7 +55,7 @@ class Synthesizer:
         # 2. Build the Instruction Set
         instruction = (
             f"ROLE: {role}\n"
-            f"GOAL: Address issue #{ctx.issue_number}: {ctx.issue_title or ctx.metadata.get('original_task', {}).get('issue_title', 'Unknown Issue')}\n"
+            f"GOAL: Address issue #{ctx.issue_number}: {ctx.issue_title or 'Unknown Issue'}\n"
             f"REPO: {ctx.repo_full_name or ctx.repo_url}\n\n"
         )
 

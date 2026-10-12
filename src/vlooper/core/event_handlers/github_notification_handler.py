@@ -15,8 +15,8 @@ class GitHubNotificationHandler:
         """Posts a summary comment to the GitHub issue/PR after pipeline completion."""
         # Construct task data for the legacy helper function
         task_data = {
-            "repo_full_name": ctx.metadata.get("repo_full_name"),
-            "task_type": ctx.metadata["original_task"]["task_type"],
+            "repo_full_name": ctx.repo_full_name,
+            "task_type": ctx.task_type,
             "branch_name": ctx.branch_name,
         }
 
