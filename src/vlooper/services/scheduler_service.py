@@ -34,10 +34,12 @@ class SchedulerService:
         ]
         
         for idx, step in enumerate(steps):
+            # Use large gaps (1000) between initial steps to allow room for 
+            # reactive corrective steps without requiring database shifts.
             self.db.add_step(
                 task_id=task_id,
                 role=step["role"],
-                order_index=idx + 1,
+                order_index=(idx + 1) * 1000,
                 input_data=step["input_data"]
             )
         
@@ -98,16 +100,19 @@ class SchedulerService:
                     }
 
         if new_step:
-            # Insert the corrective step as the next in line (highest order index + 1)
-            max_idx = max(s["order_index"] for s in all_steps)
+            # Shift existing steps to make room for the new one (insertion sort style)
+            self.db.shift_step_orders(task_id, order_index + 1)
+
             self.db.add_step(
                 task_id=task_id,
                 role=new_step["role"],
-                order_index=max_idx + 1,
+                order_index=order_index + 1,
                 input_data=new_step["input_data"]
             )
-            logger.info("[SCHEDULER] Injected corrective step '%s' for Task #%s", new_step["role"], task_id)
+            logger.info("[SCHEDULER] Injected corrective step '%s' at order index %d for Task #%s", 
+                        new_step["role"], order_index + 1, task_id)
             return True
+
 
         return False
 

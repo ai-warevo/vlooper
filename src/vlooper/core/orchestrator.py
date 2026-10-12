@@ -123,9 +123,11 @@ class VLooperOrchestrator:
         logger.info("\nStopping orchestrator...")
         self.running = False
 
-    def _map_task_to_context(self, task: dict[str, Any]) -> TaskContext:
-        """Maps a raw database task record into an isolated TaskContext instance."""
-        return TaskContext(
+    def _map_task_to_context(self, task: dict[str, Any], completed_steps: list[dict[str, Any]]) -> TaskContext:
+        """Maps a raw database task record into an isolated TaskContext instance.
+        Uses completed_steps to reconstruct the context state (workspace, branch, etc.).
+        """
+        ctx = TaskContext(
             task_id=str(task["id"]),
             issue_number=(
                 int(task["issue_number"]) if task["issue_number"] is not None else 0
@@ -139,6 +141,38 @@ class VLooperOrchestrator:
                 "original_task": task,  # Preserve original record if needed
             },
         )
+
+        # Reconstruct context from previous completed steps to support retries/resumes
+        try:
+            for step in completed_steps:
+                raw_output = step.get("output_data")
+                if not raw_output:
+                    continue
+
+                # Parse the JSON output from the database
+                try:
+                    output = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                # Handle both direct dicts and "status/output" wrappers commonly used by agents
+                data_to_apply = output.get("output") if isinstance(output, dict) and "output" in output else output
+
+                if not isinstance(data_to_apply, dict):
+                    continue
+
+                # Apply updates to the context from step results
+                if "workspace_path" in data_to_apply:
+                    ctx.workspace_path = str(data_to_apply["workspace_path"])
+                if "branch_name" in data_to_apply:
+                    ctx.branch_name = str(data_to_apply["branch_name"])
+                if "repo_full_name" in data_to_apply:
+                    ctx.repo_full_name = str(data_to_apply["repo_full_name"])
+
+        except Exception as e:
+            logger.error("Failed to reconstruct context from completed steps: %s", e)
+
+        return ctx
 
     @contextlib.contextmanager
     def _lock_context(self):
@@ -162,7 +196,8 @@ class VLooperOrchestrator:
             self.db.fail_step(int(step["id"]), "Task not found")
             return
 
-        ctx = self._map_task_to_context(task)
+        history = self.db.get_completed_steps_for_task(int(step["task_id"]))
+        ctx = self._map_task_to_context(task, history)
         # Inject current step info into context metadata for visibility
         ctx.metadata["current_step"] = step
 
@@ -182,10 +217,10 @@ class VLooperOrchestrator:
             return
 
         # Prepare Mission Brief via Synthesizer with History
-        history = self.db.get_completed_steps_for_task(int(step["task_id"]))
         brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data, history=history)
 
         try:
+            self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
             logger.info("[STEP] Executing role '%s' for task #%s (Step ID: %s)", 
                         role_name, ctx.task_id, step["id"])
             
@@ -217,6 +252,15 @@ class VLooperOrchestrator:
                 # For simplicity in this phase, we check by seeing if there were any 
                 # non-completed steps remaining.
                 logger.info("[TASK] All steps for Task #%s appear to be finished.", ctx.task_id)
+
+                if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
+                    ctx.error = result.get("error") or result.get("message")
+                    ctx.is_aborted = True
+                    ctx.exit_code = 1
+                else:
+                    ctx.exit_code = 0
+
+                self.event_bus.emit(EventName.TASK_FINISHED, ctx)
 
         except Exception as e:
             logger.exception("Error during execution of role '%s'", role_name)
