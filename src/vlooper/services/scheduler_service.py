@@ -100,9 +100,6 @@ class SchedulerService:
                     }
 
         if new_step:
-            # Shift existing steps to make room for the new one (insertion sort style)
-            self.db.shift_step_orders(task_id, order_index + 1)
-
             self.db.add_step(
                 task_id=task_id,
                 role=new_step["role"],
