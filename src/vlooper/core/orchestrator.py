@@ -149,7 +149,6 @@ class VLooperOrchestrator:
         meta = {}
         if task.get("meta"):
             try:
-                import json
                 meta = json.loads(task["meta"])
             except Exception:
                 logger.warning("Failed to parse task meta for Task #%s", task["id"])
