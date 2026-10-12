@@ -7,7 +7,7 @@ from vlooper.infra.logger import get_logger
 from vlooper.infra.utils import filter_test_logs
 
 from vlooper.core.framework.context import TaskContext
-from vlooper.core.framework.events import EventName
+
 
 logger = get_logger(__name__)
 
@@ -49,9 +49,6 @@ def test_runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]
 
         if exit_code == 0:
             logger.info("[TEST_RUNNER] Tests passed successfully.")
-            event_bus = ctx.metadata.get("event_bus")
-            if event_bus:
-                event_bus.emit(EventName.HARNESS_TEST_PASSED, {"task_id": ctx.task_id})
             
             return {
                 "status": "success",

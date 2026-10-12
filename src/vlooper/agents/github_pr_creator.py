@@ -5,7 +5,7 @@ from vlooper.services.git_service import cleanup_workspace, commit_and_push, qui
 from vlooper.services.github_service import create_pull_request_workflow
 
 from vlooper.core.framework.context import TaskContext
-from vlooper.core.framework.events import EventName
+
 
 logger = get_logger(__name__)
 
@@ -78,20 +78,7 @@ def github_pr_creator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str
 
         logger.info("[GITHUB_PR_CREATOR] Pull Request created successfully!")
 
-        # 4. Emit success event for orchestrator/handlers
-        event_bus = ctx.metadata.get("event_bus")
-        if event_bus:
-            event_bus.emit(
-                EventName.GITHUB_PR_CREATED,
-                {
-                    "task_id": ctx.task_id,
-                    "repo": repo_full_name,
-                    "branch": ctx.branch_name,
-                    "details": pr_details,
-                },
-            )
-
-        # 5. Cleanup
+        # 4. Cleanup
         logger.info("[GITHUB_PR_CREATOR] Cleaning up workspace...")
         cleanup_workspace(ctx.workspace_path, ctx.branch_name)
 

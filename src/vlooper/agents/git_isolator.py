@@ -8,7 +8,7 @@ from vlooper.services.git_service import prepare_repository, setup_working_branc
 from vlooper.services.github_service import clone_repository_workflow
 
 from vlooper.core.framework.context import TaskContext
-from vlooper.core.framework.events import EventName
+
 
 logger = get_logger(__name__)
 
@@ -72,19 +72,6 @@ def git_isolator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any
         ctx.branch_name = branch_name
         ctx.repo_full_name = full_name
         ctx.metadata["repo_full_name"] = full_name
-
-        # Emit success event
-        event_bus = ctx.metadata.get("event_bus")
-        if event_bus:
-            event_bus.emit(
-                EventName.GIT_ISOLATED,
-                {
-                    "task_id": ctx.task_id,
-                    "repo": full_name,
-                    "branch": branch_name,
-                    "workspace": repo_dir,
-                },
-            )
 
         logger.info("[GIT_ISOLATOR] Repository isolated successfully at %s", repo_dir)
         

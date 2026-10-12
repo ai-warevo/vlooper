@@ -5,7 +5,6 @@ from vlooper.config import config
 from vlooper.infra.logger import get_logger
 
 from vlooper.core.framework.context import TaskContext
-from vlooper.core.framework.events import EventName
 
 logger = get_logger(__name__)
 
@@ -34,10 +33,6 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
             "status": "failed",
             "error_message": "ctx.workspace_path is not set."
         }
-
-    event_bus = ctx.metadata.get("event_bus")
-    if event_bus:
-        event_bus.emit(EventName.HARNESS_FIXING_CODE, {"task_id": ctx.task_id})
 
     # Prefer logs from raw_input (passed from previous step) or fallback to context
     error_logs = ""
