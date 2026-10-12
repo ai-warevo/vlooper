@@ -9,6 +9,7 @@ class EventName(str, Enum):
     # Task Life Cycle Events
     TASK_PICKED_UP = "task:picked_up"
     TASK_FINISHED = "task:finished"
+    TASK_DISCOVERED = "task:discovered"
 
     # Git/Repository Events
     GIT_ISOLATED = "git:isolated"

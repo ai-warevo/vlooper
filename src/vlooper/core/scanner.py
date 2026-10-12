@@ -5,7 +5,8 @@ from vlooper.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 from vlooper.services.github_service import get_assigned_items, get_github_item
-from vlooper.services.scheduler_service import SchedulerService
+from vlooper.core.framework.event_bus import EventBus
+from vlooper.core.framework.events import EventName
 
 
 logger = get_logger(__name__)
@@ -14,10 +15,10 @@ logger = get_logger(__name__)
 class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
 
-    def __init__(self, db: Database, scheduler: SchedulerService) -> None:
-        """Initialize the scanner with a database instance and scheduler."""
+    def __init__(self, db: Database, event_bus: EventBus) -> None:
+        """Initialize the scanner with a database instance and event bus."""
         self.db = db
-        self.scheduler = scheduler
+        self.event_bus = event_bus
 
     def scan(self, retry_failed=False):
         """Perform periodic scanning of organization for new tasks."""
@@ -139,13 +140,13 @@ class Scanner:  # pylint: disable=too-few-public-methods
         )
 
         if task_id:
-            # Once added, immediately plan the initial steps for it
+            # Once added, immediately plan the initial steps for it via event bus
             issue_data = {
                 "issue_number": num,
                 "repo_full_name": repo_full_name,
                 "is_pr": is_pr
             }
-            self.scheduler.plan_initial_steps(task_id, issue_data)
+            self.event_bus.emit(EventName.TASK_DISCOVERED, {"task_id": task_id, "issue_data": issue_data})
         else:
             logger.debug("Task #%s already exists or failed to add.", num)
 

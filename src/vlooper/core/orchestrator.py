@@ -63,8 +63,8 @@ class VLooperOrchestrator:
         """Initializes the orchestrator internal state and bootstraps the registry."""
         # Infrastructure layers
         self.db = Database()
-        self.scanner = Scanner(self.db)
         self.event_bus = EventBus()
+        self.scanner = Scanner(self.db, self.event_bus)
         self.synthesizer = Synthesizer()
         self.scheduler = SchedulerService(self.db)
         self.running = True
@@ -83,13 +83,15 @@ class VLooperOrchestrator:
         self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
         self.event_bus.subscribe(EventName.TASK_PICKED_UP, github_pickup_handler.handle)
         self.event_bus.subscribe(EventName.GIT_ISOLATED, git_isolated_handler.handle)
-        self.event_bus.subscribe(
-            EventName.HARNESS_TEST_PASSED, test_passed_handler.handle
-        )
-        self.event_bus.subscribe(
-            EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle
-        )
+        self.event_bus.subscribe(EventName.HARNESS_TEST_PASSED, test_passed_handler.handle)
+        self.event_bus.subscribe(EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle)
         self.event_bus.subscribe(EventName.GITHUB_PR_CREATED, pr_created_handler.handle)
+
+        # Handle newly discovered tasks
+        def handle_task_discovered(data: dict[str, Any]) -> None:
+            self.scheduler.plan_initial_steps(data["task_id"], data["issue_data"])
+
+        self.event_bus.subscribe(EventName.TASK_DISCOVERED, handle_task_discovered)
 
         # Bootstrap Role Registry
         self._bootstrap_roles()
