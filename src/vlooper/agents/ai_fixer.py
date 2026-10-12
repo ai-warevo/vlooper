@@ -1,5 +1,6 @@
 from typing import Any, Dict
 from vlooper.clients.opencode_client import OpencodeClient
+from vlooper.clients.git_client import has_uncommitted_changes
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 
@@ -44,7 +45,7 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     
     if not error_logs:
         error_logs = getattr(ctx, 'error_logs', "")
-
+    
     if not error_logs:
         logger.warning("[AI_FIXER] No error logs were found in input or context.")
         return {
@@ -85,7 +86,17 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
                 "error_message": err
             }
         else:
-            logger.info("[AI_FIXER] AI agent has successfully completed the execution.")
+            # Verify if any changes were actually made
+            changes_detected = has_uncommitted_changes(ctx.workspace_path)
+            
+            if not changes_detected:
+                logger.info("[AI_FIXER] AI agent completed execution but no code changes were detected.")
+                return {
+                    "status": "success",
+                    "output": {"applied": False, "reason": "no code changes detected"}
+                }
+
+            logger.info("[AI_FIXER] AI agent has successfully completed the execution and applied changes.")
             return {
                 "status": "success",
                 "output": {"applied": True}

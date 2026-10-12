@@ -5,6 +5,7 @@ import subprocess
 
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
+from vlooper.infra.utils import filter_test_logs
 
 from ..framework.context import TaskContext
 from ..framework.events import EventName
@@ -36,7 +37,8 @@ def run_repository_tests(ctx: TaskContext) -> None:
         )
 
         ctx.exit_code = result.returncode
-        ctx.error_logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        raw_logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        ctx.error_logs = filter_test_logs(raw_logs)
 
         if ctx.exit_code == 0:
             logger.info("Tests passed successfully.")

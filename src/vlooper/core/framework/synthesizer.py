@@ -69,6 +69,8 @@ class Synthesizer:
         else:
             instruction += "No specific input data provided for this step.\n"
 
+        instruction += "\nPRIORITY GUIDELINE: If multiple issues are present, prioritize fixing functional bugs (e.g., failed tests, AssertionErrors) over style or linting warnings (e.g., Pylint/Ruff errors). Ignore non-critical style warnings if they are not related to the primary mission.\n"
+
         instruction += "\nACTION: Execute your role's responsibility based on the information above. "
         instruction += "Return ONLY a JSON object containing any relevant results or findings."
 
