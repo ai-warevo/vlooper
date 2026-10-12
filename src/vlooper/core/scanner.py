@@ -140,13 +140,14 @@ class Scanner:  # pylint: disable=too-few-public-methods
         )
 
         if task_id:
-            issue_data = {
+            return {
                 "task_id": task_id,
-                "issue_number": num,
-                "repo_full_name": repo_full_name,
-                "is_pr": is_pr
+                "issue_data": {
+                    "issue_number": num,
+                    "repo_full_name": repo_full_name,
+                    "is_pr": is_pr
+                }
             }
-            return issue_data
         else:
             logger.debug("Task #%s already exists or failed to add.", num)
             return None
