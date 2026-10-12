@@ -39,11 +39,11 @@ from vlooper.services.scheduler_service import SchedulerService
 from vlooper.agents import (
     git_isolator_agent,
     issue_fetcher_agent,
-    test_runner_agent,
+    runner_agent,
     ai_fixer_agent,
     linter_bot_executor,
     coverage_booster_executor,
-    test_healer_executor,
+    healer_executor,
     review_fixer_executor,
     pr_reviewer_executor,
     github_pr_creator_executor,
@@ -124,14 +124,14 @@ class VLooperOrchestrator:
 
         registry.register("git_isolator", git_isolator_agent)
         registry.register("issue_fetcher", issue_fetcher_agent)
-        registry.register("test_runner", test_runner_agent)
+        registry.register("test_runner", runner_agent)
         registry.register("ai_fixer", ai_fixer_agent)
         registry.register("pr_creator", github_pr_creator_executor) # Using the new agent for pr_creator
-
+        
         # New specialized agents (returning direct dicts)
         registry.register("linter_bot", linter_bot_executor)
         registry.register("coverage_booster", coverage_booster_executor)
-        registry.register("test_healer", test_healer_executor)
+        registry.register("test_healer", healer_executor)
         registry.register("review_fixer", review_fixer_executor)
         registry.register("pr_reviewer", pr_reviewer_executor)
         registry.register("github_pr_creator", github_pr_creator_executor)
