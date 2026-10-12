@@ -25,8 +25,8 @@ from vlooper.core.scanner import Scanner
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 from vlooper.services.scheduler_service import SchedulerService
+from vlooper.services.github_service import post_github_comment
 
-# Import specialized agents
 from vlooper.agents import (
     git_isolator_agent,
     issue_fetcher_agent,
@@ -182,6 +182,18 @@ class VLooperOrchestrator:
 
         history = self.db.get_completed_steps_for_task(int(step["task_id"]))
         ctx = self._map_task_to_context(task, history)
+
+        if not history:
+            try:
+                task_data = {
+                    "repo_full_name": ctx.repo_full_name,
+                    "task_type": ctx.task_type,
+                    "branch_name": ctx.branch_name,
+                }
+                post_github_comment(task_data, "🤖 vLooper has picked up this task.")
+            except Exception as e:
+                logger.error("Failed to post 'started' comment for Task #%s: %s", ctx.task_id, e)
+
         # Inject current step info into context metadata for visibility
         ctx.metadata["current_step"] = step
 
