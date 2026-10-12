@@ -9,21 +9,12 @@ import json
 from typing import Any, Dict
 
 from vlooper.config import config
-from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
-from vlooper.core.event_handlers.git_isolated_handler import GitIsolatedHandler
-from vlooper.core.event_handlers.task_completion_handler import (
-    TaskCompletionHandler,
-)
-from vlooper.core.event_handlers.github_pickup_handler import GitHubPickupHandler
-from vlooper.core.event_handlers.pr_created_handler import PrCreatedHandler
-from vlooper.core.event_handlers.task_status_handler import TaskStatusHandler
-from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
+from vlooper.agents.utility.task_completion_agent import TaskCompletionAgent
+from vlooper.agents.utility.telemetry_agent import TelemetryAgent
 
 # Framework imports
 from vlooper.core.framework.context import TaskContext
-from vlooper.core.framework.event_bus import EventBus
-from vlooper.core.framework.events import EventName
-from vlooper.core.framework.role_registry import registry
+from vlooper.core.framework.role_registry import registry, Agent
 from vlooper.core.framework.synthesizer import Synthesizer
 from vlooper.core.middleware.middleware_error_handler import (
     GlobalExceptionHandlerMiddleware,
@@ -63,54 +54,15 @@ class VLooperOrchestrator:
         """Initializes the orchestrator internal state and bootstraps the registry."""
         # Infrastructure layers
         self.db = Database()
-        self.event_bus = EventBus()
-        self.scanner = Scanner(self.db, self.event_bus)
+        self.scanner = Scanner(self.db)
         self.synthesizer = Synthesizer()
         self.scheduler = SchedulerService(self.db)
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
 
-        # Register post-step task handlers via EventBus (maintaining compatibility)
-        status_handler = TaskStatusHandler(self.db)
-        github_handler = TaskCompletionHandler()
-        github_pickup_handler = GitHubPickupHandler()
-        git_isolated_handler = GitIsolatedHandler()
-        test_passed_handler = TestPassedHandler()
-        fixing_code_handler = FixingCodeHandler()
-        pr_created_handler = PrCreatedHandler()
-
-        self.event_bus.subscribe(EventName.TASK_FINISHED, status_handler.handle)
-        self.event_bus.subscribe(EventName.TASK_FINISHED, github_handler.handle)
-        self.event_bus.subscribe(EventName.TASK_PICKED_UP, github_pickup_handler.handle)
-        self.event_bus.subscribe(EventName.GIT_ISOLATED, git_isolated_handler.handle)
-        self.event_bus.subscribe(EventName.HARNESS_TEST_PASSED, test_passed_handler.handle)
-        self.event_bus.subscribe(EventName.HARNESS_FIXING_CODE, fixing_code_handler.handle)
-        self.event_bus.subscribe(EventName.GITHUB_PR_CREATED, pr_created_handler.handle)
-
-        # Handle newly discovered tasks
-        def handle_task_discovered(data: dict[str, Any]) -> None:
-            task_id = data["task_id"]
-            if self.db.claim_task(task_id):
-                self.scheduler.plan_initial_steps(task_id, data["issue_data"])
-                
-                # Notify that the task has been picked up (once per task)
-                task = self.db.get_task_by_id(task_id)
-                if task:
-                    ctx = TaskContext(
-                        task_id=str(task["id"]),
-                        task_type=task.get("task_type", "ISSUE"),
-                        issue_number=int(task["issue_number"]) if task["issue_number"] else 0,
-                        repo_url=task["repo_url"],
-                        workspace_path=".", 
-                        repo_full_name=task.get("repo_full_name"),
-                        branch_name=task.get("branch_name"),
-                        metadata={
-                            "original_task": task,
-                        }
-                    )
-                    self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
-
-        self.event_bus.subscribe(EventName.TASK_DISCOVERED, handle_task_discovered)
+        # Specialized Agents for Orchestration
+        self.task_completion_agent = TaskCompletionAgent()
+        self.telemetry_agent = TelemetryAgent()
 
         # Bootstrap Role Registry
         self._bootstrap_roles()
@@ -168,7 +120,7 @@ class VLooperOrchestrator:
             issue_title=meta.get("issue_title"),
             issue_body=meta.get("issue_body"),
             metadata={
-                "event_bus": self.event_bus,
+                "original_task": task,
             },
         )
 
@@ -250,10 +202,15 @@ class VLooperOrchestrator:
 
         # Prepare Mission Brief via Synthesizer with History
         brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data, history=history)
+        # Inject brief into context metadata for Agent objects to use
+        ctx.metadata["mission_brief"] = brief
 
         try:
-            # Execute the specialized role function
-            result = executor(ctx, brief)
+            # Execute the specialized role (function or Agent object)
+            if isinstance(executor, Agent):
+                result = executor.execute(ctx)
+            else:
+                result = executor(ctx, brief)
 
             # Mark step as completed and save output
             self.db.complete_step(int(step["id"]), output_data=result)
@@ -273,7 +230,20 @@ class VLooperOrchestrator:
                     ctx.error = result.get("error") or result.get("message")
                     ctx.is_aborted = True
                     ctx.exit_code = 1
-                    self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+
+                    # Finalize Task
+                    if ctx.is_aborted or (ctx.exit_code is not None and ctx.exit_code != 0):
+                        error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
+                        logger.info("Finalizing task #%s as FAILED: %s", ctx.task_id, error_msg)
+                        self.db.fail_task(ctx.task_id, error_msg)
+                    else:
+                        logger.info("Finalizing task #%s as COMPLETED.", ctx.task_id)
+                        self.db.complete_task(ctx.task_id)
+
+                    # Notify via Agents
+                    self.task_completion_agent.execute(ctx)
+                    if ctx.pr_details:
+                        self.telemetry_agent.execute(ctx)
                     return
 
             # Data Flow: Inject result into next step for this task, if it exists
@@ -293,7 +263,19 @@ class VLooperOrchestrator:
                 else:
                     ctx.exit_code = 0
 
-                self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+                # Finalize Task
+                if ctx.is_aborted or (ctx.exit_code is not None and ctx.exit_code != 0):
+                    error_msg = str(ctx.error) if ctx.error else f"Pipeline failed with exit code {ctx.exit_code}"
+                    logger.info("Finalizing task #%s as FAILED: %s", ctx.task_id, error_msg)
+                    self.db.fail_task(ctx.task_id, error_msg)
+                else:
+                    logger.info("Finalizing task #%s as COMPLETED.", ctx.task_id)
+                    self.db.complete_task(ctx.task_id)
+
+                # Notify via Agents
+                self.task_completion_agent.execute(ctx)
+                if ctx.pr_details:
+                    self.telemetry_agent.execute(ctx)
 
         except Exception as e:
             logger.exception("Error during execution of role '%s'", role_name)
@@ -313,7 +295,11 @@ class VLooperOrchestrator:
             try:
                 # Periodically scan for new tasks
                 logger.debug("Performing periodic scan for new tasks...")
-                self.scanner.scan(retry_failed=retry_failed)
+                newly_discovered = self.scanner.scan(retry_failed=retry_failed)
+                for task_info in newly_discovered:
+                    task_id = task_info["task_id"]
+                    if self.db.claim_task(task_id):
+                        self.scheduler.plan_initial_steps(task_id, task_info["issue_data"])
 
                 # Try to get next step (pending or failed)
                 if retry_failed:
