@@ -43,13 +43,6 @@ class Database:
             conn.commit()
         return True
 
-    def get_pending_tasks(self):
-        """Retrieve all pending tasks."""
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
-            return cursor.fetchall()
-
     def get_next_pending_task(self) -> dict[str, Any] | None:
         """Retrieve a single pending task."""
         with self._get_connection() as conn:

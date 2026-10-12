@@ -50,10 +50,10 @@ def test_scan_issues(scanner, db, monkeypatch):
     with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()
 
-    pending = db.get_pending_tasks()
-    assert len(pending) == 1
-    assert pending[0]["repo_full_name"] == "org/repo1"
-    assert pending[0]["branch_name"] == "issue-1"
+    pending = db.get_next_pending_task()
+    assert pending is not None
+    assert pending["repo_full_name"] == "org/repo1"
+    assert pending["branch_name"] == "issue-1"
 
 
 def test_scan_prs(scanner, db, monkeypatch):
@@ -90,7 +90,7 @@ def test_scan_prs(scanner, db, monkeypatch):
     with patch("subprocess.run", side_effect=mock_run):
         scanner.scan()
 
-    pending = db.get_pending_tasks()
-    assert len(pending) == 1
-    assert pending[0]["repo_full_name"] == "org/repo-pr"
-    assert pending[0]["branch_name"] == "feature-xyz"
+    pending = db.get_next_pending_task()
+    assert pending is not None
+    assert pending["repo_full_name"] == "org/repo-pr"
+    assert pending["branch_name"] == "feature-xyz"

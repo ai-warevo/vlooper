@@ -34,11 +34,11 @@ class WorkerShim:
         return {"repo_full_name": repo_full_name}
 
     def process_next_task(self) -> bool:
-        tasks = self.db.get_pending_tasks()
+        tasks = self.db.get_next_pending_task()
         if not tasks:
             return False
 
-        task = tasks[0]
+        task = tasks
         task_id = task["id"]
 
         if not self.db.claim_task(task_id):
@@ -71,7 +71,9 @@ def test_worker_process_next_task_success(db, pipeline):
 
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-    task_id = db.get_pending_tasks()[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # Mock the pipeline execution (since we aren't using real steps)
     with patch.object(TaskPipeline, "run", return_value=None):
@@ -93,7 +95,9 @@ def test_worker_process_next_task_failure_and_retry(db, pipeline, monkeypatch):
 
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-    task_id = db.get_pending_tasks()[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # Mock the pipeline to always fail
     with patch.object(TaskPipeline, "run", side_effect=Exception("Agent failed")):
