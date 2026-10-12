@@ -88,6 +88,36 @@ class Database:
             cursor = conn.execute("SELECT * FROM tasks")
             return cursor.fetchall()
 
+    def get_task_by_id(self, task_id: int) -> dict[str, Any] | None:
+        """Retrieve a single task by its ID."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_next_step_for_task(self, task_id: int, current_order_index: int) -> dict[str, Any] | None:
+        """Retrieve the next step for a given task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM tasks_steps WHERE task_id = ? AND order_index > ? ORDER BY order_index ASC LIMIT 1",
+                (task_id, current_order_index),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_step_input_data(self, step_id: int, input_data: dict | None):
+        """Update the input data for a specific step."""
+        import json
+        input_json = json.dumps(input_data) if input_data else None
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE tasks_steps SET input_data = ? WHERE id = ?",
+                (input_json, step_id),
+            )
+            conn.commit()
+
     def reset_task_status(self, task_id):
         """Reset a task's status to PENDING and reset its retry count."""
         with self._get_connection() as conn:
@@ -194,6 +224,36 @@ updated_at = CURRENT_TIMESTAMP
                 row = cursor.fetchone()
                 if row:
                     step_id = row['id']
+                    conn.execute(
+                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (step_id,)
+                    )
+                    conn.commit()
+                    row_dict = dict(row)
+                    row_dict['status'] = 'RUNNING'
+                    return row_dict
+                else:
+                    conn.rollback()
+                    return None
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    def get_next_failed_step(self) -> dict[str, Any] | None:
+        """Retrieve and claim the next failed step atomically."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conn.execute(
+                    "SELECT * FROM tasks_steps WHERE status = 'FAILED' ORDER BY order_index ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    step_id = row['id']
+                    # For failed steps, we might want to reset them to PENDING/RUNNING and increment retries?
+                    # Or just leave them as FAILED and let the scheduler decide how to retry.
+                    # The requirement says handles failures. Let's try setting it back to RUNNING for retry.
                     conn.execute(
                         "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (step_id,)

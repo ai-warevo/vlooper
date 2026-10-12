@@ -5,7 +5,8 @@ import fcntl
 import signal
 import sys
 import time
-from typing import Any
+import json
+from typing import Any, Dict
 
 from vlooper.config import config
 from vlooper.core.event_handlers.fixing_code_handler import FixingCodeHandler
@@ -22,45 +23,44 @@ from vlooper.core.event_handlers.test_passed_handler import TestPassedHandler
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.event_bus import EventBus
 from vlooper.core.framework.events import EventName
-from vlooper.core.framework.pipeline import TaskPipeline
+from vlooper.core.framework.role_registry import registry
+from vlooper.core.framework.synthesizer import Synthesizer
 from vlooper.core.middleware.middleware_error_handler import (
     GlobalExceptionHandlerMiddleware,
 )
 from vlooper.core.middleware.middleware_github_auth import GitHubAuthCheckMiddleware
 from vlooper.core.middleware.middleware_retry_limit import RetryLimitMiddleware
 from vlooper.core.scanner import Scanner
+from vlooper.infra.logger import get_logger
+from vlooper.persistence.database import Database
+
+# Import existing step functions to wrap them as roles
 from vlooper.core.steps.step_apply_fix import apply_ai_fix
 from vlooper.core.steps.step_fetch_issue import fetch_issue_context
 from vlooper.core.steps.step_git_isolate import git_isolate_repository
 from vlooper.core.steps.step_github_pr import github_create_pull_request
 from vlooper.core.steps.step_run_tests import run_repository_tests
-from vlooper.infra.logger import get_logger
-from vlooper.persistence.database import Database
 
 logger = get_logger(__name__)
 
 
 class VLooperDaemon:
     """
-    The main daemon process for vLooper, responsible for polling task targets
-    and bootstrapping the automated execution pipeline.
-
-    This class follows a declarative architecture where it initializes the
-    TaskPipeline with a predefined stack of middlewares and automation steps.
-    It does not contain any business logic; instead, it acts as the orchestration
-    layer that bridges the database/scanning layer with the execution engine.
+    The main daemon process for vLooper, responsible for polling for atomic steps
+    and executing them using specialized roles.
     """
 
     def __init__(self) -> None:
-        """Initializes the daemon internal state and bootstraps the pipeline."""
+        """Initializes the daemon internal state and bootstraps the registry."""
         # Infrastructure layers
         self.db = Database()
         self.scanner = Scanner(self.db)
         self.event_bus = EventBus()
+        self.synthesizer = Synthesizer()
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
 
-        # Register post-pipeline task handlers via EventBus
+        # Register post-step task handlers via EventBus (maintaining compatibility)
         status_handler = TaskStatusHandler(self.db)
         github_handler = GitHubNotificationHandler()
         github_pickup_handler = GitHubPickupHandler()
@@ -81,35 +81,30 @@ class VLooperDaemon:
         )
         self.event_bus.subscribe(EventName.GITHUB_PR_CREATED, pr_created_handler.handle)
 
-        # Core Pipeline Bootstrap
-        self.pipeline = self._bootstrap_pipeline()
+        # Bootstrap Role Registry
+        self._bootstrap_roles()
 
         # Handle termination signals
         signal.signal(signal.SIGINT, self._handle_exit)
         signal.signal(signal.SIGTERM, self._handle_exit)
 
-    def _bootstrap_pipeline(self) -> TaskPipeline:
-        """
-        Declaratively configures the central task pipeline with its
-        middleware onion layers and sequential execution steps.
-        """
-        return (
-            TaskPipeline(self.event_bus)
-            # Middleware Layering (Outer to Inner)
-            .use(GlobalExceptionHandlerMiddleware())  # Catches unforeseen bugs
-            .use(GitHubAuthCheckMiddleware())  # Fails early if tokens missing
-            .use(
-                RetryLimitMiddleware(
-                    max_pipeline_attempts=config.timeouts.max_pipeline_attempts
-                )
-            )  # Controls test-fix retries
-            # Execution Step Sequencing (Core Work)
-            .add_step(git_isolate_repository, "📂 Isolating repository")
-            .add_step(fetch_issue_context, "🔍 Fetching issue context")
-            .add_step(run_repository_tests, "🧪 Running tests")
-            .add_step(apply_ai_fix, "🤖 Applying AI fix")
-            .add_step(github_create_pull_request, "🚀 Creating pull request")
-        )
+    def _bootstrap_roles(self) -> None:
+        """Registers the existing step functions as roles in the registry."""
+        logger.info("Bootstrapping role registry...")
+
+        # Helper to wrap old-style StepFn (Callable[[TaskContext], None]) 
+        # into new RoleExecutor (Callable[[TaskContext, Dict], Dict])
+        def wrap_legacy(func):
+            def wrapper(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+                func(ctx)
+                return {}  # Return empty dict as output data
+            return wrapper
+
+        registry.register("git_isolator", wrap_legacy(git_isolate_repository))
+        registry.register("issue_fetcher", wrap_legacy(fetch_issue_context))
+        registry.register("test_runner", wrap_legacy(run_repository_tests))
+        registry.register("ai_fixer", wrap_legacy(apply_ai_fix))
+        registry.register("pr_creator", wrap_legacy(github_create_pull_request))
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
@@ -125,6 +120,8 @@ class VLooperDaemon:
             ),
             repo_url=str(task["repo_url"]),
             workspace_path=str(task.get("workspace_path", ".")),
+            repo_full_name=task.get("repo_full_name"),
+            branch_name=task.get("branch_name"),
             metadata={
                 "event_bus": self.event_bus,  # Required for steps to emit events
                 "original_task": task,  # Preserve original record if needed
@@ -145,97 +142,95 @@ class VLooperDaemon:
                 logger.error("Another instance of vLooper is already running. Exiting.")
                 sys.exit(1)
 
-    def _get_next_task(self, retry_failed: bool) -> dict[str, Any] | None:
-        """Scans and retrieves the next available task."""
-        logger.debug("--- Starting iteration (scanning for tasks) ---")
-        self.scanner.scan(retry_failed=retry_failed)
-
-        if retry_failed:
-            logger.debug("Mode [Retry]: Querying failed tasks...")
-            return self.db.get_next_failed_task()
-        else:
-            logger.debug("Mode [Normal]: Querying pending tasks...")
-            return self.db.get_next_pending_task()
-
-    def _process_task(self, task: dict[str, Any]) -> None:
-        """Handles the end-to-end lifecycle of a single task."""
-        logger.info(
-            "Target identified: Task #%s (Type: %s, Repo: %s)",
-            task["id"],
-            task["task_type"],
-            task["repo_full_name"],
-        )
-
-        # Mark as being processed in DB before running to prevent double-claiming
-        logger.debug("Attempting to claim task #%s...", task["id"])
-        if not self.db.claim_task(task["id"]):
-            logger.debug(
-                "Task #%s already claimed or ineligible (max retries reached). Skipping.",
-                task["id"],
-            )
+    def _process_step(self, step: dict[str, Any]) -> None:
+        """Handles the execution of a single atomic step."""
+        task = self.db.get_task_by_id(int(step["task_id"]))
+        if not task:
+            logger.error("Step #%s refers to non-existent task #%s", step["id"], step["task_id"])
+            self.db.fail_step(int(step["id"]), "Task not found")
             return
 
-        logger.info(
-            "Task #%s claimed successfully. Initializing pipeline context...",
-            task["id"],
-        )
         ctx = self._map_task_to_context(task)
+        # Inject current step info into context metadata for visibility
+        ctx.metadata["current_step"] = step
 
-        # Emit pickup event to notify GitHub that the agent is working on it
-        self.event_bus.emit(EventName.TASK_PICKED_UP, ctx)
+        role_name = step["role"]
+        executor = registry.get_executor(role_name)
+        if not executor:
+            logger.error("No executor registered for role '%s'", role_name)
+            self.db.fail_step(int(step["id"]), f"No executor for role {role_name}")
+            return
 
-        logger.info(
-            "Executing pipeline for Task #%s (Issue #%s)...",
-            ctx.task_id,
-            ctx.issue_number,
-        )
-        self.pipeline.run(ctx)
+        # Parse input data
+        try:
+            input_data = json.loads(step["input_data"]) if step["input_data"] else {}
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse step input_data: %s", e)
+            self.db.fail_step(int(step["id"]), "Invalid input JSON")
+            return
 
-        # Emit task completion event to trigger post-processing (DB sync, notifications, etc.)
-        self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+        # Prepare Mission Brief via Synthesizer
+        brief = self.synthesizer.prepare_mission_brief(ctx, role_name, input_data)
+
+        try:
+            logger.info("[STEP] Executing role '%s' for task #%s (Step ID: %s)", 
+                        role_name, ctx.task_id, step["id"])
+            
+            # Execute the specialized role function
+            result = executor(ctx, brief)
+
+            # Mark step as completed and save output
+            self.db.complete_step(int(step["id"]), output_data=result)
+            logger.info("[STEP] Role '%s' completed successfully.", role_name)
+
+            # Data Flow: Inject result into next step for this task, if it exists
+            next_step = self.db.get_next_step_for_task(int(step["task_id"]), step["order_index"])
+            if next_step:
+                logger.debug("[FLOW] Injecting output of step #%s into next step #%s", 
+                             step["id"], next_step["id"])
+                self.db.update_step_input_data(int(next_step["id"]), result)
+            else:
+                # Check if task is finished (no more PENDING/RUNNING steps)
+                # For simplicity in this phase, we check by seeing if there were any 
+                # non-completed steps remaining.
+                # In a production system, we'd have a more robust way to signal task completion.
+                logger.info("[TASK] All steps for Task #%s appear to be finished.", ctx.task_id)
+                # We might want to emit TASK_FINISHED here if all steps are done.
+
+        except Exception as e:
+            logger.exception("Error during execution of role '%s'", role_name)
+            self.db.fail_step(int(step["id"]), str(e))
 
     def _execute_loop(self, retry_failed: bool) -> None:
         """The main operational loop of the daemon."""
         while self.running:
             try:
-                task = self._get_next_task(retry_failed)
+                # Try to get next step (pending or failed)
+                if retry_failed:
+                    step = self.db.get_next_failed_step()
+                else:
+                    step = self.db.get_next_pending_step()
 
-                if not task:
-                    logger.debug(
-                        "No active tasks found in this scan. Sleeping for %ss...",
-                        config.timeouts.loop_sleep_seconds,
-                    )
+                if not step:
+                    # No work found, sleep and try again
                     time.sleep(config.timeouts.loop_sleep_seconds)
                     continue
 
-                self._process_task(task)
+                self._process_step(step)
 
-                # Sleep between iterations
-                logger.debug("Iteration complete. Sleeping...")
-                time.sleep(config.timeouts.loop_sleep_seconds)
+                # Small delay between steps to prevent database thrashing
+                time.sleep(0.5)
 
             except Exception:
                 logger.exception("Unexpected error in daemon loop")
-                logger.debug(
-                    "Sleeping for error recovery period (%ss)...",
-                    config.timeouts.error_wait_seconds,
-                )
                 time.sleep(config.timeouts.error_wait_seconds)
 
     def run(self, retry_failed: bool = False) -> None:
-        """
-        Main execution loop that orchestrates task scanning and processing.
-
-        Args:
-            retry_failed: If True, only poll for tasks marked as FAILED in the DB.
-        """
+        """Main execution loop."""
         try:
             with self._lock_context():
-                logger.info(
-                    "vLooper Daemon started with lock acquired. (Retry mode: %s)",
-                    retry_failed,
-                )
-
+                mode = "RETRY" if retry_failed else "NORMAL"
+                logger.info("vLooper Daemon started in %s mode.", mode)
                 self._execute_loop(retry_failed)
                 logger.info("Daemon shut down.")
 
@@ -250,5 +245,4 @@ def main(retry_failed: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    # In a real production environment, arguments would be parsed from sys.argv
     main()
