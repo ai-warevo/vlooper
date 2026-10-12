@@ -1,12 +1,11 @@
 """Scanner module to find issues and PRs using GitHub CLI."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
+
 from vlooper.config import config
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 from vlooper.services.github_service import get_assigned_items, get_github_item
-from vlooper.core.framework.event_bus import EventBus
-from vlooper.core.framework.events import EventName
 
 
 logger = get_logger(__name__)
@@ -15,13 +14,13 @@ logger = get_logger(__name__)
 class Scanner:  # pylint: disable=too-few-public-methods
     """Scanner to find issues and Pull Requests assigned to the bot."""
 
-    def __init__(self, db: Database, event_bus: EventBus) -> None:
-        """Initialize the scanner with a database instance and event bus."""
+    def __init__(self, db: Database) -> None:
+        """Initialize the scanner with a database instance."""
         self.db = db
-        self.event_bus = event_bus
 
-    def scan(self, retry_failed=False):
+    def scan(self, retry_failed=False) -> List[Dict[str, Any]]:
         """Perform periodic scanning of organization for new tasks."""
+        newly_discovered = []
         if retry_failed:
             logger.info("Mode: Retrying stale failed tasks (5m cooldown)...")
             self._retry_failed_tasks()
@@ -29,8 +28,12 @@ class Scanner:  # pylint: disable=too-few-public-methods
         logger.info(
             "Scanning for new tasks in organization: %s...", config.git.org_name
         )
-        self._scan_issues()
-        self._scan_prs()
+        
+        # Collect newly discovered items during scanning
+        newly_discovered.extend(self._scan_items(is_pr=False))
+        newly_discovered.extend(self._scan_items(is_pr=True))
+        
+        return newly_discovered
 
     def _retry_failed_tasks(self):
         """Retrieve stale failed tasks from DB and reset them."""
@@ -48,16 +51,9 @@ class Scanner:  # pylint: disable=too-few-public-methods
             self.db.reset_task_status(task["id"])
             logger.info("Task #%s reset to PENDING.", task["id"])
 
-    def _scan_issues(self):
-        """Scan for open issues assigned to the bot."""
-        self._scan_items(is_pr=False)
-
-    def _scan_prs(self):
-        """Scan for open Pull Requests assigned to the bot."""
-        self._scan_items(is_pr=True)
-
-    def _scan_items(self, is_pr: bool):
+    def _scan_items(self, is_pr: bool) -> List[Dict[str, Any]]:
         """Generic scanner for issues and PRs."""
+        newly_discovered = []
         config_data = self._get_scan_config(is_pr)
 
         logger.debug(
@@ -73,10 +69,10 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
         if err:
             logger.debug("%s search failed. Error: %s", config_data["error_label"], err)
-            return
+            return []
         if not items:
             logger.debug("No %s found.", config_data["empty_label"])
-            return
+            return []
 
         logger.debug(
             "Found %s potential issue/PR items from GitHub search.", len(items)
@@ -91,7 +87,11 @@ class Scanner:  # pylint: disable=too-few-public-methods
                 logger.warning("Skipping unauthorized task from user: %s", author_login)
                 continue
 
-            self._process_scan_item(item, config_data, is_pr)
+            processed = self._process_scan_item(item, config_data, is_pr)
+            if processed:
+                newly_discovered.append(processed)
+        
+        return newly_discovered
 
     def _get_scan_config(self, is_pr: bool) -> dict[str, str]:
         """Returns configuration metadata for the scan type."""
@@ -113,14 +113,14 @@ class Scanner:  # pylint: disable=too-few-public-methods
 
     def _process_scan_item(
         self, item: dict[str, Any], config_data: dict[str, str], is_pr: bool
-    ):
+    ) -> Optional[Dict[str, Any]]:
         """Processes a single item found during scanning."""
         num = item["number"]
         repo_full_name = item["repository"]["nameWithOwner"]
         branch = self._resolve_branch_name(num, repo_full_name, is_pr)
 
         if not branch:
-            return
+            return None
 
         logger.debug(
             "Adding task for %s #%s: %s (branch: %s)",
@@ -140,15 +140,16 @@ class Scanner:  # pylint: disable=too-few-public-methods
         )
 
         if task_id:
-            # Once added, immediately plan the initial steps for it via event bus
             issue_data = {
+                "task_id": task_id,
                 "issue_number": num,
                 "repo_full_name": repo_full_name,
                 "is_pr": is_pr
             }
-            self.event_bus.emit(EventName.TASK_DISCOVERED, {"task_id": task_id, "issue_data": issue_data})
+            return issue_data
         else:
             logger.debug("Task #%s already exists or failed to add.", num)
+            return None
 
     def _resolve_branch_name(
         self, num: int, repo_full_name: str, is_pr: bool
