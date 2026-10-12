@@ -11,7 +11,7 @@ In this new paradigm:
 ## Reference Documents
 You MUST read both files before performing any actions:
 1.  **Master Specification (Global Architecture):** `docs/subagents/global.md`
-2.  **Phase Instructions:** `docs/subagents/phase_[X]_[NAME].md` *(Note to user: Replace [X] and [NAME] with the current phase number and its name)*
+2.  **Phase Instructions:** `docs/subagents/phase_[X]_[PHASE_NAME].md` *(Note to user: Replace [X] and [PHASE_NAME] with the current phase number and its name)*
 
 ## Your Task
 Your goal is to implement **Phase [X]: [PHASE_NAME]**.
