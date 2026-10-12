@@ -1,17 +1,17 @@
-"""Module documentation."""
+from typing import Any, Dict
 
-from typing import Any
-
+from vlooper.agents.base import BaseAgent
+from vlooper.core.framework.context import TaskContext
 from vlooper.infra.logger import get_logger
 from vlooper.services.github_service import get_github_author, post_github_comment
 
 logger = get_logger(__name__)
 
 
-class TaskCompletionHandler:
+class TaskCompletionAgent(BaseAgent):
     """Handles posting summary comments to GitHub issues/PRs after pipeline completion."""
 
-    def handle(self, ctx: Any) -> None:
+    def execute(self, ctx: TaskContext) -> Dict[str, Any]:
         """Posts a summary comment to the GitHub issue/PR after pipeline completion."""
         # Construct task data for the legacy helper function
         task_data = {
@@ -25,7 +25,7 @@ class TaskCompletionHandler:
             logger.warning(
                 "Cannot post GitHub comment: missing repo_full_name or branch_name in context."
             )
-            return
+            return {"status": "error", "error_message": "Missing repo information"}
 
         try:
             # Fetch author to mention them
@@ -34,9 +34,9 @@ class TaskCompletionHandler:
 
             if ctx.exit_code == 0:
                 # Successful completion WITHOUT a PR
-                if hasattr(ctx, "pr_details") and ctx.pr_details:
-                    logger.info("PR already handled by PrCreatedHandler, skipping comment.")
-                    return
+                if ctx.pr_details:
+                    logger.info("PR already handled by TelemetryAgent, skipping comment.")
+                    return {"status": "success"}
 
                 message = (
                     f"{mention} **vLooper Automation Complete!**\n\n"
@@ -61,5 +61,8 @@ class TaskCompletionHandler:
                 logger.info("Posting failure comment to GitHub...")
                 post_github_comment(task_data, message)
 
+            return {"status": "success"}
+
         except Exception as e:
             logger.error("Failed to post completion comment to GitHub: %s", e)
+            return {"status": "error", "error_message": str(e)}
