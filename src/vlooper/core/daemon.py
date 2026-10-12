@@ -157,7 +157,12 @@ class VLooperDaemon:
             logger.debug("Mode [Normal]: Querying pending tasks...")
             tasks = self.db.get_pending_tasks()
 
-        return tasks[0] if tasks else None
+        if not tasks:
+            return None
+
+        task = tasks[0]
+        # Convert sqlite3.Row to dict if necessary to fulfill type hint and support .get()
+        return dict(task) if not isinstance(task, dict) else task
 
     def _process_task(self, task: dict[str, Any]) -> None:
         """Handles the end-to-end lifecycle of a single task."""
