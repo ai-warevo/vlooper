@@ -78,5 +78,6 @@ class Synthesizer:
             "issue_number": ctx.issue_number,
             "repo_full_name": ctx.repo_full_name or "",
             "mission_brief": instruction,
+            "action": instruction,  # Support direct action-based roles
             "raw_input": input_data # Keep raw input for the worker to use directly if needed
         }
