@@ -1,6 +1,7 @@
 """Database management for vLooper."""
 
 import sqlite3
+from typing import Any
 
 from vlooper.config import config
 from vlooper.persistence.db_migrator import DBMigrator
@@ -49,6 +50,14 @@ class Database:
             cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
             return cursor.fetchall()
 
+    def get_next_pending_task(self) -> dict[str, Any] | None:
+        """Retrieve a single pending task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING' LIMIT 1")
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def get_failed_tasks(self, min_age_seconds: int = 0):
         """Retrieve failed tasks from the database that are older than min_age_seconds."""
         with self._get_connection() as conn:
@@ -62,6 +71,21 @@ class Database:
 
             cursor = conn.execute(query, params)
             return cursor.fetchall()
+
+    def get_next_failed_task(self, min_age_seconds: int = 0) -> dict[str, Any] | None:
+        """Retrieve a single failed task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM tasks WHERE status = 'FAILED'"
+            params = []
+            if min_age_seconds > 0:
+                query += " AND updated_at < datetime('now', ?)"
+                params.append(f"-{min_age_seconds} seconds")
+
+            query += " LIMIT 1"
+            cursor = conn.execute(query, params)
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def get_all_tasks(self):
         """Retrieve all tasks from the database."""
