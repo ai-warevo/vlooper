@@ -10,7 +10,7 @@ from vlooper.core.framework.events import EventName
 logger = get_logger(__name__)
 
 
-def github_pr_creator_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def github_pr_creator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deterministic executor for GitHub PR creation.
     Uses reliable services instead of an LLM agent to prevent hallucinations.

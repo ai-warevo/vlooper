@@ -27,10 +27,11 @@ class SchedulerService:
         steps = [
             {"role": "issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
             {"role": "git_isolator", "input_data": {}},
+            {"role": "linter_bot", "input_data": {}},
             {"role": "test_runner", "input_data": {}},
-            {"role": "ai_fixer", "input_data": {}},
-            {"role": "test_runner", "input_data": {}},
+            {"role": "coverage_booster", "input_data": {}},
             {"role": "github_pr_creator", "input_data": {}},
+            {"role": "pr_reviewer", "input_data": {}},
         ]
         
         for idx, step in enumerate(steps):

@@ -5,7 +5,7 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def healer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def test_healer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: test_healer
     Task: Parses test error logs, identifies the root cause, and patches the code/tests.

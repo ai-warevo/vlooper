@@ -5,7 +5,7 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def pr_reviewer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def pr_reviewer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: pr_reviewer
     Task: Performs automated code review/audit using LLM on git diffs.

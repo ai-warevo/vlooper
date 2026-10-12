@@ -12,7 +12,7 @@ from vlooper.core.framework.events import EventName
 logger = get_logger(__name__)
 
 
-def runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def test_runner_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: test_runner
     Task: Executes the repository's local test harness and returns detailed results.

@@ -5,7 +5,7 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def coverage_booster_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def coverage_booster_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: coverage_booster
     Task: Analyzes coverage reports and generates unit tests via LLM.

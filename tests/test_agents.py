@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from vlooper.core.framework.context import TaskContext
 from vlooper.agents.git_isolator import git_isolator_agent
-from vlooper.agents.runner import runner_agent
+from vlooper.agents.agent_test_runner import test_runner_agent
 from vlooper.agents.ai_fixer import ai_fixer_agent
 from vlooper.services.github_service import clone_repository_workflow, post_github_comment, get_issue_number
 from vlooper.clients.opencode_client import OpencodeClient
@@ -70,17 +70,8 @@ def test_git_isolator_invalid_url(mock_ctx):
 
 @patch("subprocess.run")
 def test_runner_agent_success(mock_run, mock_ctx):
-    # Mock successful subprocess run
-    # Include \"Error:\" to prevent filter_test_logs from stripping it, 
-    # though technically it's not an error for a success case.\n    # Or more accurately, let's just check for the default message if no failure keywords are found.\n    mock_run.return_value = MagicMock(returncode=0, stdout=\"Tests passed! No errors.\", stderr=\"\")
-    
-    # Wait, I manually wrote that comment in my previous attempt and it was messy. Let me rewrite this properly.
-    pass
-
-@patch("subprocess.run")
-def test_runner_agent_success(mock_run, mock_ctx):
     mock_run.return_value = MagicMock(returncode=0, stdout="Tests passed! No errors.", stderr="")
-    result = runner_agent(mock_ctx, {})
+    result = test_runner_agent(mock_ctx, {})
     assert result["status"] == "success"
     assert result["output"]["exit_code"] == 0
     assert "No significant test failures detected" in result["output"]["logs"]
@@ -88,7 +79,7 @@ def test_runner_agent_success(mock_run, mock_ctx):
 @patch("subprocess.run")
 def test_runner_agent_failure(mock_run, mock_ctx):
     mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="AssertionError: Test failed!")
-    result = runner_agent(mock_ctx, {})
+    result = test_runner_agent(mock_ctx, {})
     assert result["status"] == "failed"
     assert result["output"]["exit_code"] == 1
     assert "AssertionError: Test failed!" in result["output"]["logs"]

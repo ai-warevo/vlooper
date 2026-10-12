@@ -39,14 +39,14 @@ from vlooper.services.scheduler_service import SchedulerService
 from vlooper.agents import (
     git_isolator_agent,
     issue_fetcher_agent,
-    runner_agent,
+    test_runner_agent,
     ai_fixer_agent,
-    linter_bot_executor,
-    coverage_booster_executor,
-    healer_executor,
-    review_fixer_executor,
-    pr_reviewer_executor,
-    github_pr_creator_executor,
+    linter_bot_agent,
+    coverage_booster_agent,
+    test_healer_agent,
+    review_fixer_agent,
+    pr_reviewer_agent,
+    github_pr_creator_agent,
 )
 
 
@@ -125,17 +125,17 @@ class VLooperOrchestrator:
 
         registry.register("git_isolator", git_isolator_agent)
         registry.register("issue_fetcher", issue_fetcher_agent)
-        registry.register("test_runner", runner_agent)
+        registry.register("test_runner", test_runner_agent)
         registry.register("ai_fixer", ai_fixer_agent)
-        registry.register("pr_creator", github_pr_creator_executor) # Using the new agent for pr_creator
-        
+        registry.register("pr_creator", github_pr_creator_agent)
+
         # New specialized agents (returning direct dicts)
-        registry.register("linter_bot", linter_bot_executor)
-        registry.register("coverage_booster", coverage_booster_executor)
-        registry.register("test_healer", healer_executor)
-        registry.register("review_fixer", review_fixer_executor)
-        registry.register("pr_reviewer", pr_reviewer_executor)
-        registry.register("github_pr_creator", github_pr_creator_executor)
+        registry.register("linter_bot", linter_bot_agent)
+        registry.register("coverage_booster", coverage_booster_agent)
+        registry.register("test_healer", test_healer_agent)
+        registry.register("review_fixer", review_fixer_agent)
+        registry.register("pr_reviewer", pr_reviewer_agent)
+        registry.register("github_pr_creator", github_pr_creator_agent)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
@@ -259,13 +259,20 @@ class VLooperOrchestrator:
 
             # Reactive Re-planning Trigger for successful executions that contain failure metadata
             if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
-                self.scheduler.react_to_step_outcome(
+                recovered = self.scheduler.react_to_step_outcome(
                     int(step["id"]), 
                     int(step["task_id"]), 
                     role_name, 
                     step["order_index"], 
                     result
                 )
+                if not recovered:
+                    logger.error("[STEP] Role '%s' failed and no recovery was possible.", role_name)
+                    ctx.error = result.get("error") or result.get("message")
+                    ctx.is_aborted = True
+                    ctx.exit_code = 1
+                    self.event_bus.emit(EventName.TASK_FINISHED, ctx)
+                    return
 
             # Data Flow: Inject result into next step for this task, if it exists
             next_step = self.db.get_next_step_for_task(int(step["task_id"]), step["order_index"])
@@ -275,8 +282,6 @@ class VLooperOrchestrator:
                 self.db.update_step_input_data(int(next_step["id"]), result)
             else:
                 # Check if task is finished (no more PENDING/RUNNING steps)
-                # For simplicity in this phase, we check by seeing if there were any 
-                # non-completed steps remaining.
                 logger.info("[TASK] All steps for Task #%s appear to be finished.", ctx.task_id)
 
                 if isinstance(result, dict) and result.get("status") in ["failed", "error"]:

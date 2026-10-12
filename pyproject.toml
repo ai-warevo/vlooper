@@ -49,6 +49,9 @@ ignore_missing_imports = true
 [tool.black]
 target-version = ["py312"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.pylint.messages_control]
 disable = [
     "broad-exception-caught",

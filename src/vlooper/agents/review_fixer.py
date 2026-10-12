@@ -5,7 +5,7 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def review_fixer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def review_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: review_fixer
     Task: Reads PR comments from GitHub and applies requested refinements.

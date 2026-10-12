@@ -5,7 +5,7 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def linter_bot_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def linter_bot_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: linter_bot
     Task: Use linters (e.g., ruff) to find errors and applies fixes via OpenCode.
