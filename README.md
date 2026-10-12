@@ -14,16 +14,13 @@ It scans organization-wide issues/PRs, pulls repositories locally, and runs a co
 
 ---
 
-## 🎯 How it Works (AI Git-Flow)
+## 🎯 How it Works (Agentic Git-Flow)
 
 1.  **Trigger:** Create an Issue or PR in your organization and assign it to the bot.
-2.  **Scan:** The daemon identifies new tasks via GitHub CLI (`gh`).
-3.  **Isolate:** The worker clones the repo into a local workspace and creates a dedicated branch.
-4.  **The Loop (Harness):** 
-    *   `OpenCode` generates code changes.
-    *   The worker runs your `./test.sh`.
-    *   If tests fail, the error logs are fed back to the agent to trigger an automatic fix.
-5.  **Deliver:** Once tests pass, the bot commits and pushes the branch, creating an automated **Pull Request**.
+2.  **Discovery & Planning:** The `Scanner` identifies new tasks via GitHub CLI (`gh`). For each task, the `SchedulerService` immediately generates a sequence of atomic steps (e.g., *issue_fetcher* $\rightarrow$ *git_isolator*) stored in the database.
+3.  **Execution Loop:** The `Daemon` continuously pulls individual **Steps** from the DB. It identifies the correct agent via the `RoleRegistry` and executes it using a context-rich "Mission Brief" provided by the `Synthesizer`.
+4.  **Reactive Re-planning:** If a step fails (e.g., tests fail or linter errors are found), the `SchedulerService` can dynamically inject corrective steps (like *test_healer* or *ai_fixer*) into the task's queue to resolve the issue.
+5.  **Deliver:** Once all scheduled steps are completed successfully, the bot commits and pushes the branch, creating an automated **Pull Request**.
 
 ---
 
