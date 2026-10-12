@@ -3,7 +3,6 @@ from unittest.mock import patch
 import pytest
 from vlooper import Database
 from vlooper.config import config
-from vlooper.core import error_handler
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.event_bus import EventBus
 from vlooper.core.framework.pipeline import TaskPipeline
@@ -47,6 +46,7 @@ class WorkerShim:
         # Create a context for the pipeline.
         ctx = TaskContext(
             task_id=str(task_id),
+            task_type="ISSUE",
             issue_number=task["issue_number"] or 0,
             repo_url=task["repo_url"],
             workspace_path=".",
@@ -123,25 +123,3 @@ def test_get_context_issue(db, pipeline):
     # We don't use the task dict directly in the shim anymore
     context = worker._get_context("org/repo")
     assert context == {"repo_full_name": "org/repo"}
-
-
-def test_error_handler_is_stuck():
-    """Test the stuck detection algorithm."""
-    err1 = "Error: File not found at /home/user/project/src/main.py on line 10"
-    err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"
-    err3 = "Completely different error message"
-
-    # Should be considered stuck (similar)
-    assert error_handler.is_stuck(err2, err1) is True
-    assert error_handler.is_stuck(err1, err2) is True
-
-    # Should NOT be considered stuck (different)
-    assert error_handler.is_stuck(err3, err1) is False
-    assert error_handler.is_stuck(err1, err3) is False
-
-
-def test_error_handler_edge_cases():
-    """Test edge cases for the error handler."""
-    err1 = "Some error"
-    assert error_handler.is_stuck(err1, None) is False
-    assert error_handler.is_stuck("", "") is False

@@ -6,6 +6,7 @@ import pytest
 from vlooper.config import config
 from vlooper.persistence.database import Database
 from vlooper.core.scanner import Scanner
+from vlooper.core.framework.event_bus import EventBus
 
 
 @pytest.fixture
@@ -18,7 +19,7 @@ def db(tmp_path):
 @pytest.fixture
 def scanner(db):
     """Create a scanner instance."""
-    return Scanner(db)
+    return Scanner(db, EventBus())
 
 
 def test_scan_issues(scanner, db, monkeypatch):

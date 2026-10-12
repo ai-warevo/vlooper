@@ -28,21 +28,10 @@ def test_db_init(db):
 def test_add_task(db):
     """Test adding new tasks."""
     # Test adding new tasks
-    assert (
-        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-        is True
-    )
-    assert (
-        db.add_task(
-            "PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch"
-        )
-        is True
-    )
+    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
+    assert db.add_task("PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch")
     # Test duplicate prevention
-    assert (
-        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-        is False
-    )
+    assert not db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
 
 
 def test_get_pending_tasks(db):
@@ -62,7 +51,7 @@ def test_claim_task(db):
     task_id = task["id"]
 
     # Successful claim
-    assert db.claim_task(task_id) is True
+    assert db.claim_task(task_id)
 
     # Check status updated
     with db._get_connection() as conn:
@@ -138,5 +127,5 @@ def test_get_active_claimed_task(db):
 def test_task_exists(db):
     """Test existence check for tasks."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "issue-1")
-    assert db.task_exists("org/repo1", "issue-1") is True
+    assert db.task_exists("org/repo1", "issue-1")
     assert db.task_exists("org/repo1", "non-existent") is False

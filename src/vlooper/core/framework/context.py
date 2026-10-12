@@ -17,11 +17,11 @@ class TaskContext:
     task_type: str  # ISSUE or PR
     issue_number: int
     repo_url: str
+    workspace_path: str
     repo_full_name: str | None = None
     branch_name: str | None = None
 
     # Execution state
-    workspace_path: str
     exit_code: int | None = None
     is_aborted: bool = False
     error: Exception | None = None
