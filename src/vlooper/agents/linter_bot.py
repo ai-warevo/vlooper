@@ -25,7 +25,7 @@ def linter_bot_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, An
         logger.info("[LINTER_BOT] Linting/fixing completed successfully.")
         return {
             "status": "success",
-            "output": result
+            "output": {"logs": result}
         }
     except Exception as e:
         logger.exception("[LINTER_BOT] Unexpected error during execution")

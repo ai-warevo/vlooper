@@ -24,7 +24,7 @@ def pr_reviewer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, A
         logger.info("[PR_REVIEWER] Code review completed successfully.")
         return {
             "status": "success",
-            "output": result
+            "output": {"logs": result}
         }
     except Exception as e:
         logger.exception("[PR_REVIEWER] Unexpected error during execution")

@@ -24,7 +24,7 @@ def review_fixer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, 
         logger.info("[REVIEW_FIXER] Refinement completed successfully.")
         return {
             "status": "success",
-            "output": result
+            "output": {"logs": result}
         }
     except Exception as e:
         logger.exception("[REVIEW_FIXER] Unexpected error during execution")

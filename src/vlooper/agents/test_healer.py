@@ -24,7 +24,7 @@ def test_healer_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, A
         logger.info("[TEST_HEALER] Healing completed successfully.")
         return {
             "status": "success",
-            "output": result
+            "output": {"logs": result}
         }
     except Exception as e:
         logger.exception("[TEST_HEALER] Unexpected error during execution")

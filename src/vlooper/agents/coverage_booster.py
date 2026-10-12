@@ -25,7 +25,7 @@ def coverage_booster_executor(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[s
         logger.info("[COVERAGE_BOOSTER] Coverage boosting completed successfully.")
         return {
             "status": "success",
-            "output": result
+            "output": {"logs": result}
         }
     except Exception as e:
         logger.exception("[COVERAGE_BOOSTER] Unexpected error during execution")

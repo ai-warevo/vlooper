@@ -20,7 +20,8 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
 
     # In the new architecture, we check status from raw_input (passed via brief) or context
     raw_input = brief.get("raw_input", {})
-    if raw_input.get("status") == "success" and raw_input.get("output", {}).get("exit_code") == 0:
+    output = raw_input.get("output") if isinstance(raw_input.get("output"), dict) else {}
+    if raw_input.get("status") == "success" and output.get("exit_code") == 0:
         logger.info("[AI_FIXER] Tests passed, nothing to fix.")
         return {
             "status": "success",
@@ -41,7 +42,7 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     # Prefer logs from raw_input (passed from previous step) or fallback to context
     error_logs = ""
     if raw_input.get("status") in ["failed", "error"]:
-        error_logs = raw_input.get("output", {}).get("logs", "")
+        error_logs = output.get("logs", "")
     
     if not error_logs:
         error_logs = getattr(ctx, 'error_logs', "")
@@ -66,7 +67,7 @@ def ai_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
          action_instruction += "\nIMPORTANT: DO NOT use 'git commit', 'git push', 'or any other git commands to save your work.\"\nOnly modify necessary files."
          if ctx.issue_title: action_instruction += f"\nISSUE TITLE: {ctx.issue_title}"
          if ctx.issue_body: action_instruction += f"\nISSUE DESCRIPTION:\n{ctx.issue_body}"
-         action_instruction += f"\nPREVIOUS TEST RUN FAILED (exit code: {raw_input.get('output', {}).get('exit_code', 'unknown')}).\nERROR LOGS:\n{error_logs}"
+         action_instruction += f"\nPREVIOUS TEST RUN FAILED (exit code: {output.get('exit_code', 'unknown')}).\nERROR LOGS:\n{error_logs}"
 
     client = OpencodeClient()
     logger.debug("[AI_FIXER] Executing Agent Command via client for task #%s", ctx.task_id)
