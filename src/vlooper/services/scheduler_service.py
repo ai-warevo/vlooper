@@ -155,15 +155,46 @@ class SchedulerService:
                 }
         elif status == "success":
             if role == "gh_pr_reviewer":
-                # Check if the PR review output contains critical feedback indicators
-                logs_text = str(output.get("logs", "")).upper()
-                is_critical = (
-                    output.get("critical_feedback") is True or 
-                    "REJECTED" in logs_text or
-                    "REQUESTING CHANGES" in logs_text or
-                    "REQUEST CHANGES" in logs_text or
-                    "CHANGES REQUESTED" in logs_text
-                )
+                # Determine if feedback is critical (requires changes) using LLM for higher precision
+                is_critical = output.get("critical_feedback") is True
+
+                if not is_critical:
+                    try:
+                        logger.info("[SCHEDULER] Attempting smart criticality analysis via LLM...")
+                        client = OpencodeClient()
+                        review_text = str(output.get("logs", ""))
+                        criticality_prompt = (
+                            "Analyze the following GitHub PR review feedback and determine if it requires changes "
+                            "from the developer or if the PR has been rejected.\n\n"
+                            "If the reviewer is asking for fixes, improvements, mandatory changes, or has rejected "
+                            "the PR, respond with 'true'. \n"
+                            "If the review is purely celebratory, informational, or contains only non-blocking "
+                            "minor suggestions (e.g., 'LGTM', 'nice work', or minor nits that don't require changes), "
+                            "respond with 'false'.\n\n"
+                            f"Review Feedback: {review_text}\n\n"
+                            "Return ONLY the single word 'true' or 'false'."
+                        )
+                        result, err = client.run(criticality_prompt)
+
+                        if err:
+                            logger.warning("[SCHEDULER] Smart criticality analysis failed: %s. Falling back to keyword matching.", err)
+                            # Fallback to simple keyword matching if LLM fails
+                            logs_text_upper = review_text.upper()
+                            is_critical = (
+                                "REJECTED" in logs_text_upper or
+                                "REQUESTING CHANGES" in logs_text_upper or
+                                "REQUEST CHANGES" in logs_text_upper or
+                                "CHANGES REQUESTED" in logs_text_upper
+                            )
+                        elif result:
+                            classification = result.strip().lower()
+                            is_critical = ("true" in classification) and ("false" not in classification)
+                            logger.info("[SCHEDULER] Smart criticality analysis result: %s", is_critical)
+                        else:
+                            logger.warning("[SCHEDULER] Smart criticality analysis returned empty result. Defaulting to False.")
+                    except Exception as e:
+                        logger.error("[SCHEDULER] Exception during smart criticality analysis: %s. Defaulting to False.", e)
+
                 if is_critical:
                     logger.info("[SCHEDULER] PR Reviewer reported critical feedback. Injecting 'gh_pr_review_fixer' step.")
                     new_step = {
