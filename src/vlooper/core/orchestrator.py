@@ -245,11 +245,17 @@ class VLooperOrchestrator:
             else:
                 result = executor(ctx, brief)
 
-            # Mark step as completed and save output
-            self.db.complete_step(int(step["id"]), output_data=result)
-            logger.info("[STEP] Role '%s' completed successfully.", role_name)
+            # Check if result indicates a failure before marking as completed
+            if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
+                error_msg = result.get("error") or result.get("message") or "Unknown error"
+                self.db.fail_step(int(step["id"]), error_msg)
+                logger.error("[STEP] Role '%s' failed: %s", role_name, error_msg)
+            else:
+                # Mark step as completed and save output
+                self.db.complete_step(int(step["id"]), output_data=result)
+                logger.info("[STEP] Role '%s' completed successfully.", role_name)
 
-            if isinstance(result, dict) and result.get("status") in ["failed", "error", "success"]:
+            if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
                 recovered = self.scheduler.react_to_step_outcome(
                     int(step["id"]), 
                     int(step["task_id"]), 
