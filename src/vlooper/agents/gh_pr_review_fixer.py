@@ -6,12 +6,12 @@ from vlooper.clients.opencode_client import OpencodeClient
 
 logger = get_logger(__name__)
 
-def review_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def gh_pr_review_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Role: review_fixer
+    Role: gh_pr_review_fixer
     Task: Reads PR comments from GitHub and applies requested refinements.
     """
-    logger.info("[REVIEW_FIXER] Starting refinement process...")
+    logger.info("[GH_PR_REVIEW_FIXER] Starting refinement process...")
 
     workspace_path = ctx.workspace_path
     pr_info = ""
@@ -43,14 +43,14 @@ def review_fixer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any
         # We execute the instruction. The model will call shell tools directly via opencode.
         result, err = client.run(enhanced_instruction, cwd=ctx.workspace_path)
         if err:
-            logger.error("[REVIEW_FIXER] Error executing refinement task: %s", err)
+            logger.error("[GH_PR_REVIEW_FIXER] Error executing refinement task: %s", err)
             return {"status": "failed", "error": err}
 
-        logger.info("[REVIEW_FIXER] Refinement completed successfully.")
+        logger.info("[GH_PR_REVIEW_FIXER] Refinement completed successfully.")
         return {
             "status": "success",
             "output": {"logs": result}
         }
     except Exception as e:
-        logger.exception("[REVIEW_FIXER] Unexpected error during execution")
+        logger.exception("[GH_PR_REVIEW_FIXER] Unexpected error during execution")
         return {"status": "error", "message": str(e)}

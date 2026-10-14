@@ -25,14 +25,14 @@ class SchedulerService:
         logger.info("Planning initial steps for Task #%s", task_id)
         
         steps = [
-            {"role": "issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
+            {"role": "gh_issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
             {"role": "git_isolator", "input_data": {}},
             {"role": "linter_bot", "input_data": {}},
             {"role": "test_runner", "input_data": {}},
-            {"role": "coverage_booster", "input_data": {}},
+            {"role": "test_coverage_booster", "input_data": {}},
             {"role": "git_pusher", "input_data": {}},
-            {"role": "github_pr_manager", "input_data": {}},
-            {"role": "pr_reviewer", "input_data": {}},
+            {"role": "gh_pr_manager", "input_data": {}},
+            {"role": "gh_pr_reviewer", "input_data": {}},
         ]
         
         for idx, step in enumerate(steps):
@@ -87,7 +87,7 @@ class SchedulerService:
                     "input_data": {"context": str(output)}
                 }
         elif status == "success":
-            if role == "pr_reviewer":
+            if role == "gh_pr_reviewer":
                 # Check if the PR review output contains critical feedback indicators
                 logs_text = str(output.get("logs", "")).upper()
                 is_critical = (
@@ -97,21 +97,21 @@ class SchedulerService:
                     "CHANGES REQUESTED" in logs_text
                 )
                 if is_critical:
-                    logger.info("[SCHEDULER] PR Reviewer reported critical feedback. Injecting 'review_fixer' step.")
+                    logger.info("[SCHEDULER] PR Reviewer reported critical feedback. Injecting 'gh_pr_review_fixer' step.")
                     new_step = {
-                        "role": "review_fixer",
+                        "role": "gh_pr_review_fixer",
                         "input_data": {"context": str(output)}
                     }
-            elif role == "review_fixer":
+            elif role == "gh_pr_review_fixer":
                 # After a successful fix, re-trigger the validation pipeline to ensure quality.
                 logger.info("[SCHEDULER] Review fixer completed successfully. Re-triggering validation pipeline.")
                 validation_roles = [
                     "linter_bot", 
                     "test_runner", 
-                    "coverage_booster", 
+                    "test_coverage_booster", 
                     "git_pusher",
-                    "github_pr_manager",
-                    "pr_reviewer"
+                    "gh_pr_manager",
+                    "gh_pr_reviewer"
                 ]
                 for i, v_role in enumerate(validation_roles):
                     self.db.add_step(

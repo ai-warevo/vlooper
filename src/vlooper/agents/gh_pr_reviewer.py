@@ -8,13 +8,13 @@ from vlooper.clients.opencode_client import OpencodeClient
 logger = get_logger(__name__)
 
 
-def pr_reviewer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
+def gh_pr_reviewer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Role: pr_reviewer
+    Role: gh_pr_reviewer
     Task: Performs automated code review using LLM and GitHub CLI.
     The agent is instructed to use shell tools (git, gh) to perform the review.
     """
-    logger.info("[PR_REVIEWER] Starting automated code review...")
+    logger.info("[GH_PR_REVIEWER] Starting automated code review...")
 
     # Prepare context for the LLM
     pr_info = ""

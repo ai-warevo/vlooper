@@ -54,7 +54,7 @@ class TestPersistenceV1(unittest.TestCase):
         # 2. Add Steps
         self.db.add_step(task_id, "linter_bot", 1, {"files": ["main.py"]})
         self.db.add_step(task_id, "test_healer", 2)
-        self.db.add_step(task_id, "github_pr_creator", 3)
+        self.db.add_step(task_id, "git_pusher", 3)
 
         # 3. Claim Step 1
         step1 = self.db.get_next_pending_step()
@@ -94,7 +94,7 @@ class TestPersistenceV1(unittest.TestCase):
         # 6. Claim Step 3
         step3 = self.db.get_next_pending_step()
         self.assertIsNotNone(step3)
-        self.assertEqual(step3['role'], "github_pr_creator")
+        self.assertEqual(step3['role'], "git_pusher")
         self.assertEqual(step3['order_index'], 3)
         self.assertEqual(step3['status'], "RUNNING")
 

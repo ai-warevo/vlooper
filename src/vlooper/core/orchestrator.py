@@ -30,17 +30,16 @@ from vlooper.services.github_service import post_github_comment
 
 from vlooper.agents import (
     git_isolator_agent,
-    issue_fetcher_agent,
+    gh_issue_fetcher_agent,
     test_runner_agent,
     ai_fixer_agent,
     linter_bot_agent,
-    coverage_booster_agent,
+    test_coverage_booster_agent,
     test_healer_agent,
-    review_fixer_agent,
-    pr_reviewer_agent,
-    github_pr_creator_agent,
+    gh_pr_review_fixer_agent,
+    gh_pr_reviewer_agent,
     git_pusher_agent,
-    github_pr_manager_agent,
+    gh_pr_manager_agent,
 )
 
 
@@ -85,17 +84,16 @@ class VLooperOrchestrator:
         logger.info("Bootstrapping role registry...")
 
         registry.register("git_isolator", git_isolator_agent)
-        registry.register("issue_fetcher", issue_fetcher_agent)
+        registry.register("gh_issue_fetcher", gh_issue_fetcher_agent)
         registry.register("test_runner", test_runner_agent)
         registry.register("ai_fixer", ai_fixer_agent)
         registry.register("linter_bot", linter_bot_agent)
-        registry.register("coverage_booster", coverage_booster_agent)
+        registry.register("test_coverage_booster", test_coverage_booster_agent)
         registry.register("test_healer", test_healer_agent)
-        registry.register("review_fixer", review_fixer_agent)
-        registry.register("pr_reviewer", pr_reviewer_agent)
-        registry.register("github_pr_creator", github_pr_creator_agent)
+        registry.register("gh_pr_review_fixer", gh_pr_review_fixer_agent)
+        registry.register("gh_pr_reviewer", gh_pr_reviewer_agent)
         registry.register("git_pusher", git_pusher_agent)
-        registry.register("github_pr_manager", github_pr_manager_agent)
+        registry.register("gh_pr_manager", gh_pr_manager_agent)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
