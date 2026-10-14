@@ -242,8 +242,7 @@ class VLooperOrchestrator:
             self.db.complete_step(int(step["id"]), output_data=result)
             logger.info("[STEP] Role '%s' completed successfully.", role_name)
 
-            # Reactive Re-planning Trigger for successful executions that contain failure metadata
-            if isinstance(result, dict) and result.get("status") in ["failed", "error"]:
+            if isinstance(result, dict) and result.get("status") in ["failed", "error", "success"]:
                 recovered = self.scheduler.react_to_step_outcome(
                     int(step["id"]), 
                     int(step["task_id"]), 
@@ -251,7 +250,7 @@ class VLooperOrchestrator:
                     step["order_index"], 
                     result
                 )
-                if not recovered:
+                if not recovered and result.get("status") in ["failed", "error"]:
                     logger.error("[STEP] Role '%s' failed and no recovery was possible.", role_name)
                     ctx.error = result.get("error") or result.get("message")
                     ctx.is_aborted = True
