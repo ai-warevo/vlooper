@@ -2,6 +2,7 @@
 
 import json
 from typing import Any, Dict, List, Optional
+from vlooper.clients.opencode_client import OpencodeClient
 from vlooper.infra.logger import get_logger
 from vlooper.persistence.database import Database
 
@@ -21,11 +22,49 @@ class SchedulerService:
     def plan_initial_steps(self, task_id: int, issue_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Analyzes a new issue and generates an initial sequence of Steps in the database.
+        Uses LLM to classify if the issue is a 'feature' or a 'bug'.
         """
-        logger.info("Planning initial steps for Task #%s (Type: %s)", task_id, issue_data.get("task_type", "unknown"))
-        
-        # Determine initial plan based on task type
-        is_feature = issue_data.get("task_type") == "feature"
+        logger.info("Planning initial steps for Task #%s", task_id)
+
+        issue_title = issue_data.get("issue_title") or "No title"
+        issue_body = issue_data.get("issue_body") or "No body"
+
+        # Determine initial plan based on LLM classification
+        is_feature = False  # Default to bug per robustness requirement
+        try:
+            logger.info("[SCHEDULER] Attempting task type classification via LLM...")
+            client = OpencodeClient()
+            classification_prompt = (
+                "Analyze the following GitHub issue and classify it as either 'feature' or 'bug'. "
+                "A 'feature' is a new piece of functionality or requirement. "
+                "A 'bug' is a fix for existing broken behavior, an error, or unintended side effect.\n\n"
+                f"Title: {issue_title}\n"
+                f"Body: {issue_body}\n\n"
+                "Return ONLY the single word 'feature' or 'bug'."
+            )
+            result, err = client.run(classification_prompt)
+
+            if err:
+                logger.warning("[SCHEDULER] Classification failed due to error: %s. Defaulting to 'bug'.", err)
+            elif result:
+                classification = result.strip().lower()
+                # Robust check for the presence of target words
+                if "feature" in classification and "bug" not in classification:
+                    is_feature = True
+                    logger.info("[SCHEDULER] Classification successful: Task is a FEATURE.")
+                elif "bug" in classification:
+                    is_feature = False
+                    logger.info("[SCHEDULER] Classification successful: Task is a BUG.")
+                else:
+                    logger.warning("[SCHEDULER] Unexpected classification output: '%s'. Defaulting to 'bug'.", result)
+            else:
+                logger.warning("[SCHEDULER] Classification returned empty result. Defaulting to 'bug'.")
+
+        except Exception as e:
+            logger.error("[SCHEDULER] Exception during task type classification: %s. Defaulting to 'bug'.", e, exc_info=True)
+            is_feature = False
+
+        logger.info("Task #%s classified as %s", task_id, "feature" if is_feature else "bug")
 
         if is_feature:
             steps = [
@@ -121,6 +160,7 @@ class SchedulerService:
                 is_critical = (
                     output.get("critical_feedback") is True or 
                     "REJECTED" in logs_text or
+                    "REQUESTING CHANGES" in logs_text or
                     "REQUEST CHANGES" in logs_text or
                     "CHANGES REQUESTED" in logs_text
                 )
@@ -167,4 +207,3 @@ class SchedulerService:
     def react_to_step_failure(self, step_id: int, task_id: int, role: str, error_msg: str) -> bool:
         """Legacy shim for backward compatibility (mapping to react_to_step_outcome)."""
         return self.react_to_step_outcome(step_id, task_id, role, 0, {"status": "error", "error_message": error_msg})
-
