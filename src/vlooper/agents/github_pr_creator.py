@@ -1,8 +1,7 @@
 from typing import Any, Dict
 from vlooper.infra.logger import get_logger
 from vlooper.services.ai_service import generate_commit_message, generate_pr_metadata
-from vlooper.services.git_service import cleanup_workspace, commit_and_push, quick_reset
-from vlooper.services.github_service import create_pull_request_workflow
+from vlooper.services.git_service import cleanup_workspace, quick_reset
 
 from vlooper.core.framework.context import TaskContext
 
@@ -13,9 +12,9 @@ logger = get_logger(__name__)
 def github_pr_creator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deterministic executor for GitHub PR creation.
-    Uses reliable services instead of an LLM agent to prevent hallucinations.
+    Now composed of git_pusher and github_pr_manager agents for better modularity.
     """
-    logger.info("[GITHUB_PR_CREATOR] Starting deterministic PR creation process...")
+    logger.info("[GITHUB_PR_CREATOR] Starting (composed) PR creation process...")
 
     # 1. Safety check: Only proceed if tests passed
     if ctx.exit_code is not None and ctx.exit_code != 0:
@@ -41,14 +40,21 @@ def github_pr_creator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str
         }
 
     try:
-        # 2. Commit and Push
+        # Importing locally to avoid potential circular dependencies during initialization
+        from vlooper.agents.git_pusher import git_pusher_agent
+        from vlooper.agents.github_pr_manager import github_pr_manager_agent
+
+        # 2. Commit and Push (via git_pusher)
         logger.info("[GITHUB_PR_CREATOR] Generating commit message...")
         commit_msg = generate_commit_message(ctx.workspace_path, ctx.issue_number)
         
-        logger.info("[GITHUB_PR_CREATOR] Committing and pushing branch %s...", ctx.branch_name)
-        commit_and_push(ctx.workspace_path, ctx.branch_name, commit_msg)
+        logger.info("[GITHUB_PR_CREATOR] Delegating to git_pusher agent...")
+        pusher_result = git_pusher_agent(ctx, {"commit_message": commit_msg})
+        
+        if pusher_result["status"] == "failed":
+            raise Exception(f"Git Pusher failed: {pusher_result.get('error')}")
 
-        # 3. Create Pull Request
+        # 3. Create Pull Request (via github_pr_manager)
         logger.info("[GITHUB_PR_CREATOR] Generating PR metadata...")
         pr_title, pr_body = generate_pr_metadata(
             ctx.workspace_path,
@@ -58,28 +64,24 @@ def github_pr_creator_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str
             issue_body=ctx.issue_body,
         )
 
-        logger.info("[GITHUB_PR_CREATOR] Opening Pull Request via GitHub CLI...")
-        pr_details, err = create_pull_request_workflow(
-            repo_full_name=repo_full_name,
-            title=pr_title,
-            body=pr_body,
-            cwd=ctx.workspace_path,
-        )
+        logger.info("[GITHUB_PR_CREATOR] Delegating to github_pr_manager agent...")
+        manager_result = github_pr_manager_agent(ctx, {
+            "pr_title": pr_title, 
+            "pr_body": pr_body
+        })
 
-        if err:
-            logger.error("[GITHUB_PR_CREATOR] GitHub CLI failed: %s", err)
-            return {
-                "status": "failed",
-                "error": f"GitHub CLI error: {err}"
-            }
+        if manager_result["status"] == "failed":
+            raise Exception(f"PR Manager failed: {manager_result.get('error')}")
 
-        # Store details in context (as the original step did)
+        # Update context with PR details (handling both new and existing PR scenarios)
+        pr_details = manager_result["output"]["pr_details"]
         ctx.pr_details = pr_details  # type: ignore
 
-        logger.info("[GITHUB_PR_CREATOR] Pull Request created successfully!")
+        logger.info("[GITHUB_PR_CREATOR] Pull Request process completed successfully!")
 
         # 4. Cleanup
         logger.info("[GITHUB_PR_CREATOR] Cleaning up workspace...")
+        from vlooper.services.git_service import cleanup_workspace as _cleanup # To stay safe with shadow names if any, though not needed here
         cleanup_workspace(ctx.workspace_path, ctx.branch_name)
 
         return {

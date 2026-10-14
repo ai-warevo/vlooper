@@ -30,7 +30,8 @@ class SchedulerService:
             {"role": "linter_bot", "input_data": {}},
             {"role": "test_runner", "input_data": {}},
             {"role": "coverage_booster", "input_data": {}},
-            {"role": "github_pr_creator", "input_data": {}},
+            {"role": "git_pusher", "input_data": {}},
+            {"role": "github_pr_manager", "input_data": {}},
             {"role": "pr_reviewer", "input_data": {}},
         ]
         
@@ -108,7 +109,8 @@ class SchedulerService:
                     "linter_bot", 
                     "test_runner", 
                     "coverage_booster", 
-                    "github_pr_creator", 
+                    "git_pusher",
+                    "github_pr_manager",
                     "pr_reviewer"
                 ]
                 for i, v_role in enumerate(validation_roles):

@@ -39,6 +39,8 @@ from vlooper.agents import (
     review_fixer_agent,
     pr_reviewer_agent,
     github_pr_creator_agent,
+    git_pusher_agent,
+    github_pr_manager_agent,
 )
 
 
@@ -86,15 +88,14 @@ class VLooperOrchestrator:
         registry.register("issue_fetcher", issue_fetcher_agent)
         registry.register("test_runner", test_runner_agent)
         registry.register("ai_fixer", ai_fixer_agent)
-        registry.register("pr_creator", github_pr_creator_agent)
-
-        # New specialized agents (returning direct dicts)
         registry.register("linter_bot", linter_bot_agent)
         registry.register("coverage_booster", coverage_booster_agent)
         registry.register("test_healer", test_healer_agent)
         registry.register("review_fixer", review_fixer_agent)
         registry.register("pr_reviewer", pr_reviewer_agent)
         registry.register("github_pr_creator", github_pr_creator_agent)
+        registry.register("git_pusher", git_pusher_agent)
+        registry.register("github_pr_manager", github_pr_manager_agent)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""

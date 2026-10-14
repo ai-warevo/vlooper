@@ -8,6 +8,8 @@ from vlooper.agents.agent_test_healer import test_healer_agent
 from vlooper.agents.review_fixer import review_fixer_agent
 from vlooper.agents.pr_reviewer import pr_reviewer_agent
 from vlooper.agents.github_pr_creator import github_pr_creator_agent
+from vlooper.agents.git_pusher import git_pusher_agent
+from vlooper.agents.github_pr_manager import github_pr_manager_agent
 
 __all__ = [
     "git_isolator_agent",
@@ -20,4 +22,6 @@ __all__ = [
     "review_fixer_agent",
     "pr_reviewer_agent",
     "github_pr_creator_agent",
+    "git_pusher_agent",
+    "github_pr_manager_agent",
 ]
