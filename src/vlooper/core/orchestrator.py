@@ -2,6 +2,7 @@
 
 import contextlib
 import fcntl
+import os
 import signal
 import sys
 import time
@@ -59,6 +60,12 @@ class VLooperOrchestrator:
         self.scheduler = SchedulerService(self.db)
         self.running = True
         self.lock_file = "/tmp/vlooper.lock"
+
+        # Set Git identity via environment variables to avoid polluting .git/config
+        os.environ["GIT_AUTHOR_NAME"] = config.git.git_user_name
+        os.environ["GIT_AUTHOR_EMAIL"] = config.git.git_user_email
+        os.environ["GIT_COMMITTER_NAME"] = config.git.git_user_name
+        os.environ["GIT_COMMITTER_EMAIL"] = config.git.git_user_email
 
         # Specialized Agents for Orchestration
         self.task_completion_agent = TaskCompletionAgent()

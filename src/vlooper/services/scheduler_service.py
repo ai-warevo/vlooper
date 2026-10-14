@@ -101,6 +101,24 @@ class SchedulerService:
                         "role": "review_fixer",
                         "input_data": {"context": str(output)}
                     }
+            elif role == "review_fixer":
+                # After a successful fix, re-trigger the validation pipeline to ensure quality.
+                logger.info("[SCHEDULER] Review fixer completed successfully. Re-triggering validation pipeline.")
+                validation_roles = [
+                    "linter_bot", 
+                    "test_runner", 
+                    "coverage_booster", 
+                    "github_pr_creator", 
+                    "pr_reviewer"
+                ]
+                for i, v_role in enumerate(validation_roles):
+                    self.db.add_step(
+                        task_id=task_id,
+                        role=v_role,
+                        order_index=order_index + 10 + (i * 1000),
+                        input_data={}
+                    )
+                return True
 
         if new_step:
             self.db.add_step(
