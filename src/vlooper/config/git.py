@@ -23,6 +23,9 @@ class GitConfig:
     gh_token: str | None = field(
         default_factory=lambda: os.environ.get("GH_TOKEN", None)
     )
+    gh_reviewer_token: str | None = field(
+        default_factory=lambda: os.environ.get("GH_TOKEN_REVIEWER", None)
+    )
     authorized_users: list[str] = field(
         default_factory=lambda: [
             u.strip()
