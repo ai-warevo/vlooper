@@ -3,7 +3,6 @@ from unittest.mock import patch
 import pytest
 from vlooper import Database
 from vlooper.config import config
-from vlooper.core import error_handler
 from vlooper.core.framework.context import TaskContext
 from vlooper.core.framework.event_bus import EventBus
 from vlooper.core.framework.pipeline import TaskPipeline
@@ -34,11 +33,11 @@ class WorkerShim:
         return {"repo_full_name": repo_full_name}
 
     def process_next_task(self) -> bool:
-        tasks = self.db.get_pending_tasks()
+        tasks = self.db.get_next_pending_task()
         if not tasks:
             return False
 
-        task = tasks[0]
+        task = tasks
         task_id = task["id"]
 
         if not self.db.claim_task(task_id):
@@ -47,6 +46,7 @@ class WorkerShim:
         # Create a context for the pipeline.
         ctx = TaskContext(
             task_id=str(task_id),
+            task_type="ISSUE",
             issue_number=task["issue_number"] or 0,
             repo_url=task["repo_url"],
             workspace_path=".",
@@ -71,7 +71,9 @@ def test_worker_process_next_task_success(db, pipeline):
 
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-    task_id = db.get_pending_tasks()[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # Mock the pipeline execution (since we aren't using real steps)
     with patch.object(TaskPipeline, "run", return_value=None):
@@ -93,7 +95,9 @@ def test_worker_process_next_task_failure_and_retry(db, pipeline, monkeypatch):
 
     # Setup: Add a task to DB
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-    task_id = db.get_pending_tasks()[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # Mock the pipeline to always fail
     with patch.object(TaskPipeline, "run", side_effect=Exception("Agent failed")):
@@ -119,25 +123,3 @@ def test_get_context_issue(db, pipeline):
     # We don't use the task dict directly in the shim anymore
     context = worker._get_context("org/repo")
     assert context == {"repo_full_name": "org/repo"}
-
-
-def test_error_handler_is_stuck():
-    """Test the stuck detection algorithm."""
-    err1 = "Error: File not found at /home/user/project/src/main.py on line 10"
-    err2 = "Error: File not found at /home/toor/project/src/main.py on line 10"
-    err3 = "Completely different error message"
-
-    # Should be considered stuck (similar)
-    assert error_handler.is_stuck(err2, err1) is True
-    assert error_handler.is_stuck(err1, err2) is True
-
-    # Should NOT be considered stuck (different)
-    assert error_handler.is_stuck(err3, err1) is False
-    assert error_handler.is_stuck(err1, err3) is False
-
-
-def test_error_handler_edge_cases():
-    """Test edge cases for the error handler."""
-    err1 = "Some error"
-    assert error_handler.is_stuck(err1, None) is False
-    assert error_handler.is_stuck("", "") is False

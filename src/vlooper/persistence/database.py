@@ -1,6 +1,8 @@
 """Database management for vLooper."""
 
+import json
 import sqlite3
+from typing import Any
 
 from vlooper.config import config
 from vlooper.persistence.db_migrator import DBMigrator
@@ -24,30 +26,31 @@ class Database:
         """Get a connection to the SQLite database."""
         return sqlite3.connect(self.db_path)
 
-    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name):
-        """Add a new task to the database."""
+    def add_task(self, task_type, repo_full_name, repo_url, issue_number, branch_name, meta: str | None = None) -> int | None:
+        """Add a new task to the database. Returns the new task ID or None if it already exists."""
         # Check if task already exists to avoid duplicates
         if self.task_exists(repo_full_name, branch_name):
-            return False
+            return None
 
         with self._get_connection() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO tasks (task_type, repo_full_name, repo_url, issue_number, 
-                                   branch_name, status)
-                VALUES (?, ?, ?, ?, ?, 'PENDING')
+                                   branch_name, status, meta)
+                VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
             """,
-                (task_type, repo_full_name, repo_url, issue_number, branch_name),
+                (task_type, repo_full_name, repo_url, issue_number, branch_name, meta),
             )
             conn.commit()
-        return True
+            return cursor.lastrowid
 
-    def get_pending_tasks(self):
-        """Retrieve all pending tasks."""
+    def get_next_pending_task(self) -> dict[str, Any] | None:
+        """Retrieve a single pending task."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING'")
-            return cursor.fetchall()
+            cursor = conn.execute("SELECT * FROM tasks WHERE status = 'PENDING' LIMIT 1")
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def get_failed_tasks(self, min_age_seconds: int = 0):
         """Retrieve failed tasks from the database that are older than min_age_seconds."""
@@ -63,12 +66,57 @@ class Database:
             cursor = conn.execute(query, params)
             return cursor.fetchall()
 
+    def get_next_failed_task(self, min_age_seconds: int = 0) -> dict[str, Any] | None:
+        """Retrieve a single failed task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM tasks WHERE status = 'FAILED'"
+            params = []
+            if min_age_seconds > 0:
+                query += " AND updated_at < datetime('now', ?)"
+                params.append(f"-{min_age_seconds} seconds")
+
+            query += " LIMIT 1"
+            cursor = conn.execute(query, params)
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def get_all_tasks(self):
         """Retrieve all tasks from the database."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM tasks")
             return cursor.fetchall()
+
+    def get_task_by_id(self, task_id: int) -> dict[str, Any] | None:
+        """Retrieve a single task by its ID."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_next_step_for_task(self, task_id: int, current_order_index: int) -> dict[str, Any] | None:
+        """Retrieve the next step for a given task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM tasks_steps WHERE task_id = ? AND order_index > ? ORDER BY order_index ASC LIMIT 1",
+                (task_id, current_order_index),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def update_step_input_data(self, step_id: int, input_data: dict | None):
+        """Update the input data for a specific step."""
+        import json
+        input_json = json.dumps(input_data) if input_data else None
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE tasks_steps SET input_data = ? WHERE id = ?",
+                (input_json, step_id),
+            )
+            conn.commit()
 
     def reset_task_status(self, task_id):
         """Reset a task's status to PENDING and reset its retry count."""
@@ -148,3 +196,116 @@ updated_at = CURRENT_TIMESTAMP
                 (repo_full_name, branch_name),
             )
             return cursor.fetchone() is not None
+
+    def add_step(self, task_id: int, role: str, order_index: int, input_data: dict | None = None) -> int:
+        """Add a new step to a task."""
+        input_json = json.dumps(input_data) if input_data else None
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO tasks_steps (task_id, role, status, order_index, input_data)
+                VALUES (?, ?, 'PENDING', ?, ?)
+            """,
+                (task_id, role, order_index, input_json),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_task_steps(self, task_id: int) -> list[dict[str, Any]]:
+        """Retrieve all steps for a given task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks_steps WHERE task_id = ? ORDER BY order_index ASC", (task_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_completed_steps_for_task(self, task_id: int) -> list[dict[str, Any]]:
+        """Retrieve all completed steps for a given task."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM tasks_steps WHERE task_id = ? AND status = 'COMPLETED' ORDER BY order_index ASC", (task_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_next_pending_step(self) -> dict[str, Any] | None:
+        """Retrieve and claim the next pending step atomically."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conn.execute(
+                    "SELECT * FROM tasks_steps WHERE status = 'PENDING' ORDER BY order_index ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    step_id = row['id']
+                    conn.execute(
+                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (step_id,)
+                    )
+                    conn.commit()
+                    row_dict = dict(row)
+                    row_dict['status'] = 'RUNNING'
+                    return row_dict
+                else:
+                    conn.rollback()
+                    return None
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    def get_next_failed_step(self) -> dict[str, Any] | None:
+        """Retrieve and claim the next failed step atomically."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = conn.execute(
+                    "SELECT * FROM tasks_steps WHERE status = 'FAILED' ORDER BY order_index ASC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row:
+                    step_id = row['id']
+                    # For failed steps, we might want to reset them to PENDING/RUNNING and increment retries?
+                    # Or just leave them as FAILED and let the scheduler decide how to retry.
+                    # The requirement says handles failures. Let's try setting it back to RUNNING for retry.
+                    conn.execute(
+                        "UPDATE tasks_steps SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (step_id,)
+                    )
+                    conn.commit()
+                    row_dict = dict(row)
+                    row_dict['status'] = 'RUNNING'
+                    return row_dict
+                else:
+                    conn.rollback()
+                    return None
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    def complete_step(self, step_id: int, output_data: dict | None = None):
+        """Mark a step as completed."""
+        output_json = json.dumps(output_data) if output_data else None
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE tasks_steps 
+                SET status = 'COMPLETED', output_data = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """,
+                (output_json, step_id),
+            )
+            conn.commit()
+
+    def fail_step(self, step_id: int, error_msg: str):
+        """Mark a step as failed."""
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                UPDATE tasks_steps 
+                SET status = 'FAILED', error = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            """,
+                (error_msg, step_id),
+            )
+            conn.commit()
+

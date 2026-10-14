@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 🔄 vLooper Harness: Combined Quality Check & Test Suite
-# This script is used by the vLooper daemon to verify code changes.
+# This script is used by the vLooper orchestrator to verify code changes.
 
 echo "🚀 Starting full quality check..."
 

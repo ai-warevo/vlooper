@@ -12,19 +12,25 @@ class TaskContext:
     and arbitrary metadata.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
+    # Core identity fields (extracted from database)
     task_id: str
+    task_type: str  # ISSUE or PR
     issue_number: int
     repo_url: str
-    workspace_path: str  # Added this
+    workspace_path: str
     repo_full_name: str | None = None
     branch_name: str | None = None
+
+    # Execution state
     exit_code: int | None = None
-    error_logs: str | None = None
     is_aborted: bool = False
     error: Exception | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    status: str = "PENDING"  # PENDING, CLAIMED, COMPLETED, FAILED
+
+    # Extra information (parsed from meta)
     issue_title: str | None = None
     issue_body: str | None = None
     pr_details: dict[str, Any] | None = None
+
+    # Dynamic context/runtime info
+    metadata: dict[str, Any] = field(default_factory=dict)

@@ -8,49 +8,44 @@
 
 ---
 
-The **vLooper** project is a modular, event-driven system with a multi-layered structure designed for autonomous task execution (specifically, automated bug fixing in GitHub repositories using AI).
+The **vLooper** project is a modular, agentic system designed for autonomous task execution (specifically, automated bug fixing in GitHub repositories using AI). 
 
-The system design can be characterized as a combination of the **Pipeline**, **Middleware/Onion**, and **Observer (Event Bus)** patterns.
+Unlike traditional linear pipelines, vLooper utilizes a **step-based reactive architecture**. Instead of executing a single monolithic task, the system breaks work down into discrete, trackable steps that can be dynamically re-planned based on real-time feedback.
 
 ## Core Architectural Layers
 
-### 1. Orchestration Layer (`VLooperDaemon`)
-This is the system's control center. The daemon runs in an infinite loop, performing the following functions:
-* **Scanning:** Uses a `Scanner` to search for new tasks in the database or via external APIs.
-* **Lifecycle Management:** Retrieves tasks, marks them as "claimed," and initiates execution.
-* **Isolation:** Ensures only one instance of the daemon is running using file locking (`fcntl.flock`).
+### 1. Discovery & Planning Layer (`Scanner` & `SchedulerService`)
+This layer identifies work and defines the initial roadmap.
+* **Scanning:** The `Scanner` monitors GitHub for new issues or Pull Requests and persists them to the database.
+* **Initial Planning:** Upon finding a task, the `SchedulerService` immediately generates a sequence of atomic steps (e.g., *issue_fetcher* $\rightarrow$ *git_isolator*) required to start the work.
+* **Reactive Re-planning:** The "Brain" of the system. If a step fails or returns critical feedback (like test failures), the `SchedulerService` can dynamically inject corrective steps (e.g., *test_healer*, *ai_fixer*) into the current task's queue.
 
-### 2. Execution Engine (`TaskPipeline` & Middleware)
-Instead of hardcoded logic, vLooper uses a flexible task processing pipeline:
-* **Middleware (Onion Layers):** Wrappers around the core process. They handle cross-cutting concerns such as global exception handling (`GlobalExceptionHandlerMiddleware`), authentication checks, and retry limit control (`RetryLimitMiddleware`).
-* **Steps:** Sequential atomic operations executed within a protected context:
-    1. Environment setup (`git_isolate_repository`).
-    2. Running the test harness (`run_repository_tests`).
-    3. Applying AI fixes (`apply_ai_fix`).
-    4. Creating a Pull Request (`github_create_pull_request`).
+### 2. Execution & Orchestration Loop (`VLooperOrchestrator`, `RoleRegistry`, `Synthesizer`)
+The orchestrator operates as a continuous consumer of work from the database.
+* **Step-Based Processing:** The `VLooperOrchestrator` runs in an infinite loop, pulling individual **Steps** rather than entire tasks. This allows for high resilience; if a step fails, only that step (or its corrective successor) needs attention.
+* **Role Registry:** To ensure loose coupling, agents are not hardcoded. Instead, the `RoleRegistry` maps role identifiers to specific executor functions (e.g., mapping "test_runner" to `test_runner_agent`).
+* **Context Synthesis:** The `Synthesizer` prepares high-signal "Mission Briefs" for each agent. It aggregates global task context, current step requirements, and the execution history of all previously completed steps into a single instruction set.
 
-### 3. Event Layer (`EventBus` & Handlers)
-To ensure loose coupling, an event bus is utilized. This allows the separation of core execution logic from side effects:
-* **Events:** When something significant happens (a task is picked up, tests pass, a PR is created), an event is emitted (e.g., `EventName.TASK_FINISHED`).
-* **Handlers:** Components subscribed to the bus react to these events. For example, the `GitHubNotificationHandler` sends notifications, while the `TaskStatusHandler` updates the database status. This enables adding new system reactions without modifying the pipeline code itself.
+### 3. Data Flow & Step Management (`Database` & `Step Lifecycle`)
+The system relies on the database as a shared state and communication bus between agents.
+* **Atomic Steps:** Every action is recorded in the `tasks_steps` table, tracking its status (PENDING, RUNNING, COMPLETED, FAILED), inputs, outputs, and errors.
+* **Automated Data Injection:** vLooper automatically facilitates data flow by taking the `output_data` of a completed step and injecting it as the `input_data` for the next step in the sequence.
 
-### 4. Services and Clients Layer (`services/` & `clients/`)
-There is a clear separation of responsibilities:
-* **Clients:** Low-level tools for direct interaction with external APIs (Git, GitHub, OpenCode).
-* **Services:** High-level business logic that orchestrates the work of clients (e.g., `ai_service` manages interactions with the language model).
-
-### 5. Persistence Layer (`persistence/`)
-Used for storing task states and execution history. It includes a database migration system, ensuring data schema evolution without information loss.
+### 4. Persistence Layer (`Database`)
+The database acts as the single source of truth, managing:
+* **Task States:** High-level status of repositories and issues being worked on.
+* **Step Granularity:** A detailed audit trail of every atomic operation performed by any agent.
+* **Migrations:** A robust system for evolving the database schema as the project grows.
 
 ## Design Patterns Used
 
 | Pattern | Application in vLooper |
 | :--- | :--- |
-| **Daemon** | A background process continuously monitoring external task sources. |
-| **Pipeline / Interceptor** | Sequential task processing through a chain of steps and middleware. |
-| **Observer (Event Bus)** | Decoupling execution logic from notification systems and DB updates. |
-| **Layered Architecture** | Clear separation: UI $\rightarrow$ Daemon $\rightarrow$ Services $\rightarrow$ Clients $\rightarrow$ Infra/DB. |
-| **Strategy / Step** | Encapsulating each stage of work (tests, fix, PR) into a separate callable object. |
+| **Producer-Consumer** | `Scanner` produces tasks $\rightarrow$ `Orchestrator` consumes atomic steps from the DB. |
+| **Reactive Planning** | The system dynamically modifies the task execution plan based on step outcomes. |
+| **Registry Pattern** | Decouples role names from their implementations via `RoleRegistry`. |
+| **Command / Step Pattern** | Encapsulates every discrete action into a trackable, idempotent database entry. |
+| **Synthesizer (Contextualization)** | Aggregates fragmented state/history into coherent instructions for LLM agents. |
 
 ## Summary
-The architecture is designed to be **highly extensible** (easily adding new steps or event handlers) and **resilient** (thanks to error-handling middleware layers and retry mechanisms). The system is well-suited for complex, long-running automated processes.
+The vLooper architecture is designed to be **highly resilient**, **massively parallelizable** (multiple orchestrators can process steps simultaneously), and **intrinsically adaptive** to the unpredictable nature of software debugging.

@@ -41,38 +41,36 @@ def post_github_comment(task, message):
     repo_full_name = task["repo_full_name"]
     task_type = task["task_type"]
     branch_name = task.get("branch_name")
-    issue_num = task.get("issue_number")
+    issue_num_fallback = task.get("issue_number")
 
-    if task_type == "ISSUE":
+    if task_type in ["ISSUE", "PR"]:
         try:
-            # Try to get number from branch name if available
+            # Try to get number from branch name if available (e.g., 'fix-123')
             num = None
             if branch_name:
                 parts = branch_name.split("-")
                 if len(parts) >= 2:
                     num = parts[-1]
 
-            # Fallback to issue_number from task dict
-            if not num and issue_num:
-                num = str(issue_num)
+            # Fallback to issue_number/pr_number from task dict if available
+            if not num and issue_num_fallback:
+                num = str(issue_num_fallback)
 
             if num:
                 _, err = post_comment(repo_full_name, num, message)
                 if err:
                     logger.warning(
-                        "Failed to post GitHub comment for #%s: %s", num, err
+                        "Failed to post GitHub comment for #%s (%s): %s", num, task_type, err
                     )
             else:
                 logger.warning(
-                    "Could not find issue number in branch name or task data: %s (branch: %s)",
-                    issue_num,
+                    "Could not find issue/PR number in branch name or task data: %s (branch: %s)",
+                    issue_num_fallback,
                     branch_name,
                 )
         except Exception as e:  # noqa: W0718
             logger.error("Error posting GitHub comment: %s", e)
-    elif task_type == "PR":
-        logger.debug(get_pr_details(repo_full_name, branch_name))
-        logger.debug("TODO: pr comment logic ...")
+
 
 
 def get_github_author(task):

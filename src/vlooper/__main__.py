@@ -6,10 +6,10 @@ import os
 import sys
 
 try:
-    from vlooper.core.daemon import VLooperDaemon
+    from vlooper.core.orchestrator import VLooperOrchestrator
 except ImportError as exc:
     raise ImportError(
-        "Could not import VLooperDaemon. "
+        "Could not import VLooperOrchestrator. "
         "Ensure you are running from the project root."
     ) from exc
 
@@ -30,9 +30,9 @@ def get_tui_class() -> type | None:
 
 
 def main(argv=None):
-    """Main entry point for the vLooper daemon."""
+    """Main entry point for the vLooper orchestrator."""
     setup_logging()
-    parser = argparse.ArgumentParser(description="vLooper Daemon")
+    parser = argparse.ArgumentParser(description="vLooper Orchestrator")
     parser.add_argument("--tui", action="store_true", help="Run the TUI dashboard")
     parser.add_argument(
         "--retry-failed", action="store_true", help="Retry failed tasks from database"
@@ -48,14 +48,14 @@ def main(argv=None):
         app.run()
         return
 
-    # Standard Daemon execution
+    # Standard Orchestrator execution
     if "GH_TOKEN" not in os.environ:
         logger.warning(
             "Warning: GH_TOKEN is not set. Some GitHub operations might fail."
         )
 
-    daemon = VLooperDaemon()
-    daemon.run(retry_failed=args.retry_failed)
+    orchestrator = VLooperOrchestrator()
+    orchestrator.run(retry_failed=args.retry_failed)
 
 
 def main_tui():

@@ -28,44 +28,30 @@ def test_db_init(db):
 def test_add_task(db):
     """Test adding new tasks."""
     # Test adding new tasks
-    assert (
-        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-        is True
-    )
-    assert (
-        db.add_task(
-            "PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch"
-        )
-        is True
-    )
+    assert db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
+    assert db.add_task("PR", "org/repo1", "https://github.com/org/repo1", 42, "feature-branch")
     # Test duplicate prevention
-    assert (
-        db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
-        is False
-    )
+    assert not db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 123, "main")
 
 
 def test_get_pending_tasks(db):
-    """Test getting pending tasks."""
+    """Test getting a pending task."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
-    db.add_task("PR", "org/repo2", "https://github.com/org/repo2", 2, "branch-2")
-    db.add_task(
-        "ISSUE", "org/repo3", "https://github.com/org/repo3", 3, "main"
-    )  # PENDING
-
-    pending = db.get_pending_tasks()
-    assert len(pending) == 3
-    assert pending[0]["repo_full_name"] == "org/repo1"
+    
+    task = db.get_next_pending_task()
+    assert task is not None
+    assert task["repo_full_name"] == "org/repo1"
 
 
 def test_claim_task(db):
     """Test claiming a task."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
-    tasks = db.get_pending_tasks()
-    task_id = tasks[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # Successful claim
-    assert db.claim_task(task_id) is True
+    assert db.claim_task(task_id)
 
     # Check status updated
     with db._get_connection() as conn:
@@ -79,8 +65,9 @@ def test_claim_task(db):
 def test_complete_task(db):
     """Test completing a task."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
-    tasks = db.get_pending_tasks()
-    task_id = tasks[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
     db.claim_task(task_id)
 
     db.complete_task(task_id)
@@ -95,8 +82,9 @@ def test_fail_task_retry(db, monkeypatch):
     monkeypatch.setattr(config.timeouts, "max_task_retries", 2)
 
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
-    tasks = db.get_pending_tasks()
-    task_id = tasks[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
 
     # First failure: should move back to PENDING
     db.fail_task(task_id, "Error 1")
@@ -126,8 +114,9 @@ def test_fail_task_retry(db, monkeypatch):
 def test_get_active_claimed_task(db):
     """Test getting an active claimed task."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "main")
-    tasks = db.get_pending_tasks()
-    task_id = tasks[0]["id"]
+    task = db.get_next_pending_task()
+    assert task is not None
+    task_id = task["id"]
     db.claim_task(task_id)
 
     active = db.get_active_claimed_task()
@@ -138,5 +127,5 @@ def test_get_active_claimed_task(db):
 def test_task_exists(db):
     """Test existence check for tasks."""
     db.add_task("ISSUE", "org/repo1", "https://github.com/org/repo1", 1, "issue-1")
-    assert db.task_exists("org/repo1", "issue-1") is True
+    assert db.task_exists("org/repo1", "issue-1")
     assert db.task_exists("org/repo1", "non-existent") is False

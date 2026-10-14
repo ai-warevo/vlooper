@@ -99,15 +99,24 @@ def cleanup_workspace(repo_dir, branch_name):
 
     try:
         default_branch = get_default_branch(repo_dir)
+        logger.info("Checking out default branch %s...", default_branch)
         checkout(repo_dir, default_branch, force=True)
-    except VLooperError:
-        logger.warning("Could not checkout main during cleanup. Detaching HEAD.")
+    except VLooperError as e:
+        logger.warning("Could not checkout default branch during cleanup (%s). Detaching HEAD.", e)
         _, err = run_command(["git", "checkout", "--detach"], cwd=repo_dir)
         if err:
             logger.error("Failed to detach HEAD in cleanup: %s", err)
 
     reset_hard(repo_dir)
     clean_files(repo_dir)
+    
+    # Final attempt to ensure we are on the default branch
+    try:
+        default_branch = get_default_branch(repo_dir)
+        checkout(repo_dir, default_branch, force=True)
+    except Exception as e:
+        logger.error("Failed final safety checkout to %s: %s", default_branch, e)
+
     delete_branch(repo_dir, branch_name)
 
 
