@@ -22,18 +22,33 @@ class SchedulerService:
         """
         Analyzes a new issue and generates an initial sequence of Steps in the database.
         """
-        logger.info("Planning initial steps for Task #%s", task_id)
+        logger.info("Planning initial steps for Task #%s (Type: %s)", task_id, issue_data.get("task_type", "unknown"))
         
-        steps = [
-            {"role": "gh_issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
-            {"role": "git_isolator", "input_data": {}},
-            {"role": "linter_bot", "input_data": {}},
-            {"role": "test_runner", "input_data": {}},
-            {"role": "test_coverage_booster", "input_data": {}},
-            {"role": "git_pusher", "input_data": {}},
-            {"role": "gh_pr_manager", "input_data": {}},
-            {"role": "gh_pr_reviewer", "input_data": {}},
-        ]
+        # Determine initial plan based on task type
+        is_feature = issue_data.get("task_type") == "feature"
+
+        if is_feature:
+            steps = [
+                {"role": "gh_issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
+                {"role": "feature_implementer", "input_data": {}},
+                {"role": "linter_bot", "input_data": {}},
+                {"role": "test_runner", "input_data": {}},
+                {"role": "test_coverage_booster", "input_data": {}},
+                {"role": "git_pusher", "input_data": {}},
+                {"role": "gh_pr_manager", "input_data": {}},
+                {"role": "gh_pr_reviewer", "input_data": {}},
+            ]
+        else:
+            steps = [
+                {"role": "gh_issue_fetcher", "input_data": {"issue_number": issue_data.get("issue_number")}},
+                {"role": "git_isolator", "input_data": {}},
+                {"role": "linter_bot", "input_data": {}},
+                {"role": "test_runner", "input_data": {}},
+                {"role": "test_coverage_booster", "input_data": {}},
+                {"role": "git_pusher", "input_data": {}},
+                {"role": "gh_pr_manager", "input_data": {}},
+                {"role": "gh_pr_reviewer", "input_data": {}},
+            ]
         
         for idx, step in enumerate(steps):
             # Use large gaps (1000) between initial steps to allow room for 
@@ -75,11 +90,24 @@ class SchedulerService:
         # Pattern Mapping logic
         if status in ["failed", "error"]:
             if role == "test_runner":
-                logger.info("[SCHEDULER] Test failure detected. Injecting 'test_healer' step.")
-                new_step = {
-                    "role": "test_healer",
-                    "input_data": {"context": str(output)}
-                }
+                logs_text = str(output.get("logs", "")).lower()
+                # Heuristic to decide if it's a bug or an environment issue
+                env_indicators = ["module not found", "command not found", "import error", "permission denied", "dependency", "missing"]
+                is_env_issue = any(indicator in logs_text for indicator in env_indicators)
+
+                if is_env_issue:
+                    logger.info("[SCHEDULER] Test environment issue detected. Injecting 'test_healer' step.")
+                    new_step = {
+                        "role": "test_healer",
+                        "input_data": {"context": str(output)}
+                    }
+                else:
+                    logger.info("[SCHEDULER] Test logic failure detected. Injecting 'bug_fixer' step.")
+                    new_step = {
+                        "role": "bug_fixer",
+                        "input_data": {"context": str(output)}
+                    }
+
             elif role == "linter_bot":
                 logger.info("[SCHEDULER] Linter errors detected. Injecting 'ai_fixer' step.")
                 new_step = {

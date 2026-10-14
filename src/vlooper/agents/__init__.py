@@ -9,6 +9,8 @@ from vlooper.agents.gh_pr_review_fixer import gh_pr_review_fixer_agent
 from vlooper.agents.gh_pr_reviewer import gh_pr_reviewer_agent
 from vlooper.agents.git_pusher import git_pusher_agent
 from vlooper.agents.gh_pr_manager import gh_pr_manager_agent
+from vlooper.agents.feature_implementer import feature_implementer_agent
+from vlooper.agents.bug_fixer import bug_fixer_agent
 
 __all__ = [
     "git_isolator_agent",
@@ -22,4 +24,6 @@ __all__ = [
     "gh_pr_reviewer_agent",
     "git_pusher_agent",
     "gh_pr_manager_agent",
+    "feature_implementer_agent",
+    "bug_fixer_agent",
 ]

@@ -8,24 +8,29 @@ logger = get_logger(__name__)
 def test_healer_agent(ctx: TaskContext, brief: Dict[str, Any]) -> Dict[str, Any]:
     """
     Role: test_healer
-    Task: Parses test error logs, identifies the root cause, and patches the code/tests.
+    Task: Fixes broken tests, environment issues, or flaky testing infrastructure.
     """
-    logger.info("[TEST_HEALER] Starting failure analysis...")
+    logger.info("[TEST_HEALER] Starting test/environment healing...")
 
-    action_instruction = brief.get("action", "Analyze the provided test failures, identify the cause (in code or tests), and apply a fix to resolve them.")
+    # The mission brief should contain instructions on what is wrong with the tests
+    action_instruction = brief.get(
+        "action",
+        f"The tests are failing due to infrastructure or test-code issues, not business logic. "
+        f"Analyze these logs: {ctx.error_logs}. Fix the test files or environment (e.g., missing dependencies, incorrect assertions in tests) so that they can run reliably."
+    )
 
     client = OpencodeClient()
     try:
         result, err = client.run(action_instruction, cwd=ctx.workspace_path)
         if err:
-            logger.error("[TEST_HEALER] Error executing healing task: %s", err)
+            logger.error("[TEST_HEALER] Error during test healing: %s", err)
             return {"status": "failed", "error": err}
 
-        logger.info("[TEST_HEALER] Healing completed successfully.")
+        logger.info("[TEST_HEALER] Test healing completed successfully.")
         return {
             "status": "success",
             "output": {"logs": result}
         }
     except Exception as e:
-        logger.exception("[TEST_HEALER] Unexpected error during execution")
+        logger.exception("[TEST_HEALER] Unexpected error during test healing")
         return {"status": "error", "message": str(e)}

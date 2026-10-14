@@ -40,6 +40,8 @@ from vlooper.agents import (
     gh_pr_reviewer_agent,
     git_pusher_agent,
     gh_pr_manager_agent,
+    feature_implementer_agent,
+    bug_fixer_agent,
 )
 
 
@@ -94,6 +96,8 @@ class VLooperOrchestrator:
         registry.register("gh_pr_reviewer", gh_pr_reviewer_agent)
         registry.register("git_pusher", git_pusher_agent)
         registry.register("gh_pr_manager", gh_pr_manager_agent)
+        registry.register("feature_implementer", feature_implementer_agent)
+        registry.register("bug_fixer", bug_fixer_agent)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
