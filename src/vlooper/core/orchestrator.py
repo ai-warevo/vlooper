@@ -42,6 +42,7 @@ from vlooper.agents import (
     gh_pr_manager_agent,
     feature_implementer_agent,
     bug_fixer_agent,
+    task_classifier_agent,
 )
 
 
@@ -98,6 +99,7 @@ class VLooperOrchestrator:
         registry.register("gh_pr_manager", gh_pr_manager_agent)
         registry.register("feature_implementer", feature_implementer_agent)
         registry.register("bug_fixer", bug_fixer_agent)
+        registry.register("task_classifier_agent", task_classifier_agent)
 
     def _handle_exit(self, _signum: int, _frame: Any) -> None:
         """Handles graceful shutdown on signals."""
